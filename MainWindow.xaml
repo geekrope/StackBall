@@ -32,6 +32,25 @@
                             </DirectionalLight.Transform>
                         </DirectionalLight>
                     </ModelVisual3D.Content>
+                    <!--<ModelVisual3D>
+                        <ModelVisual3D.Content>
+                            <GeometryModel3D x:Name="geom">
+                                <GeometryModel3D.Geometry>
+                                    <MeshGeometry3D/>
+                                </GeometryModel3D.Geometry>
+                                <GeometryModel3D.Material>
+                                    <DiffuseMaterial Brush="Red" />
+                                </GeometryModel3D.Material>
+                                <GeometryModel3D.Transform>
+                                    <RotateTransform3D>
+                                        <RotateTransform3D.Rotation>
+                                            <AxisAngleRotation3D x:Name="rotate" Axis="0 1 0" />
+                                        </RotateTransform3D.Rotation>
+                                    </RotateTransform3D>                                    
+                                </GeometryModel3D.Transform>
+                            </GeometryModel3D>
+                        </ModelVisual3D.Content>
+                    </ModelVisual3D>-->
                 </ModelVisual3D>
             </Viewport3D.Children>
         </Viewport3D>

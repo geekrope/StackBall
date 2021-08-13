@@ -17,11 +17,126 @@ using System.Windows.Threading;
 
 namespace StackBall
 {
+    public enum BallState
+    {
+        Hitting, Jumping
+    }
+
+    public static class Extentions
+    {
+        public static Model3DCollection ExpandCollection(this List<Model3DCollection> collections)
+        {
+            var result = new Model3DCollection();
+            foreach (var item in collections)
+            {
+                foreach (var model in item)
+                {
+                    result.Add(model);
+                }
+            }
+            return result;
+        }
+        public static Transform3D AddTransform(this Transform3D origin, Transform3D addition)
+        {
+            return new Transform3DGroup() { Children = new Transform3DCollection() { origin, addition } };
+        }
+        public static Model3DCollection Merge(this MeshGeometry3D[] geometryes3D, Material material)
+        {
+            var collection = new Model3DCollection();
+            foreach (var geometry in geometryes3D)
+            {
+                var model3D = new GeometryModel3D(geometry, material);
+                model3D.SetValue(GeometryModel3D.BackMaterialProperty, material);
+                collection.Add(model3D);
+            }
+            return collection;
+        }
+    }
+
+    public class PlayerBall
+    {
+        private Model3DCollection Ball
+        {
+            get; set;
+        }
+        /// <summary>
+        /// Radius count
+        /// </summary>
+        public readonly (double, int) BlockSettings = (1, 100);
+        public BallState State
+        {
+            get; set;
+        }
+
+        private MeshGeometry3D[] GetSphere(double radius, int count)
+        {
+            var parts = new MeshGeometry3D[2];
+
+            Func<int, MeshGeometry3D> getHalfSphere = (int sign) =>
+            {
+                var vertices = new List<Point3D>();
+                var indices = new List<int>();
+
+                Action<int> createVertices = (int sign) =>
+                {
+                    for (int indexY = 0; indexY < count; indexY += 1)
+                    {
+                        var angleY = Math.PI / (count - 1) * indexY - Math.PI / 2;
+                        var y = Math.Sin(angleY) * radius;
+                        var parallelRadius = Math.Abs(Math.Sqrt(Math.Pow(radius, 2) - Math.Pow(y, 2)));
+
+                        for (int indexX = 0; indexX < count; indexX += 1)
+                        {
+                            var angleX = Math.PI / (count - 1) * indexX;
+                            var x = Math.Cos(angleX) * parallelRadius;
+                            var z = Math.Sin(angleX) * parallelRadius * sign;
+
+                            vertices.Add(new Point3D(x, y, z));
+                        }
+                    }
+                };
+
+                Action<int> getIndices = (int offset) =>
+                {
+                    for (int index = 0; index < count * (count - 1); index += 1)
+                    {
+                        var index1 = index + offset;
+                        var index2 = index + 1 + offset;
+                        var index3 = index + count + offset;
+                        var index4 = index + count + 1 + offset;
+                        indices.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+                    }
+                };
+
+                Func<List<Point3D>, List<int>, MeshGeometry3D> create3DObject = (List<Point3D> vertices, List<int> indices) =>
+                {
+                    return new MeshGeometry3D() { Positions = new Point3DCollection(vertices), TriangleIndices = new Int32Collection(indices) };
+                };
+
+                createVertices(1);
+                getIndices(0);
+
+                return create3DObject(vertices, indices);
+            };
+
+
+            parts[0] = getHalfSphere(1);
+            parts[1] = getHalfSphere(-1);
+
+            return parts;
+        }
+        public PlayerBall()
+        {
+            Ball = GetSphere(BlockSettings.Item1, BlockSettings.Item2).Merge(new DiffuseMaterial(Brushes.DodgerBlue));
+        }
+    }
+
     public class Block
     {
         private double OffsetY;
         private bool Disposing;
         private const double DisposeRadius = 0.25;
+        private const double AngleDelta = 1;
         private double Angle;
         private (int, int)[] deadZones;
         private List<Model3DCollection> DeadZonesGeometry
@@ -56,33 +171,20 @@ namespace StackBall
             DeadZonesGeometry = new List<Model3DCollection>();
             HealthZonesGeometry = new List<Model3DCollection>();
 
-            Func<double, double, Brush, Model3D[]> createZone = (double startAngle, double sweepAngle, Brush color) =>
+            Func<double, double, Brush, Model3DCollection> createZone = (double startAngle, double sweepAngle, Brush color) =>
                {
                    var arc = GetArc(BlockSettings.Item1, BlockSettings.Item2, ToRad(startAngle), ToRad(sweepAngle), BlockSettings.Item3, BlockSettings.Item4);
-                   var result = new Model3D[4];
-                   Action<int> addModel = (int index) =>
-                   {
-                       var material = new DiffuseMaterial(color);
-                       var model = new GeometryModel3D(arc[index], material);
-                       model.SetValue(GeometryModel3D.BackMaterialProperty, material);
-
-                       result[index] = model;
-                   };
-                   for (int index = 0; index < 4; index++)
-                   {
-                       addModel(index);
-                   }
-                   return result;
+                   return arc.Merge(new DiffuseMaterial(color));
                };
 
             foreach (var healthZone in HealthZones)
             {
-                HealthZonesGeometry.Add(new Model3DCollection(createZone(healthZone.Item1, healthZone.Item2, HealthZoneColor)));
+                HealthZonesGeometry.Add(createZone(healthZone.Item1, healthZone.Item2, HealthZoneColor));
             }
 
             foreach (var deadZone in DeadZones)
             {
-                DeadZonesGeometry.Add(new Model3DCollection(createZone(deadZone.Item1, deadZone.Item2, DeadZoneColor)));
+                DeadZonesGeometry.Add(createZone(deadZone.Item1, deadZone.Item2, DeadZoneColor));
             }
         }
         /// <summary>
@@ -122,9 +224,9 @@ namespace StackBall
                     var z2 = Math.Sin(angle) * (radius - width);
 
                     verticesTop[index] = new Point3D(x, height / 2 + OffsetY, z);
-                    verticesTop[index + 1] = new Point3D(x2 , height / 2 + OffsetY, z2);
+                    verticesTop[index + 1] = new Point3D(x2, height / 2 + OffsetY, z2);
 
-                    verticesBottom[index] = new Point3D(x , -height / 2 + OffsetY, z);
+                    verticesBottom[index] = new Point3D(x, -height / 2 + OffsetY, z);
                     verticesBottom[index + 1] = new Point3D(x2, -height / 2 + OffsetY, z2);
 
                     verticesFront[index] = new Point3D(x, -height / 2 + OffsetY, z);
@@ -137,7 +239,7 @@ namespace StackBall
 
             Action getIndices = () =>
             {
-                for (int index = 0; index < count-3; index += 2)
+                for (int index = 0; index < count - 3; index += 2)
                 {
                     var index1 = index;
                     var index2 = index + 1;
@@ -165,13 +267,13 @@ namespace StackBall
 
             return parts;
         }
-        private void Rotate(List<Model3DCollection> models3D)
+        private void Rotate(List<Model3DCollection> models3D, double angle)
         {
             foreach (var model in models3D)
             {
                 foreach (var obj in model)
                 {
-                    obj.Transform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), Angle));
+                    obj.Transform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), angle));
                 }
             }
         }
@@ -179,7 +281,7 @@ namespace StackBall
         {
             foreach (var element in collection)
             {
-                element.Transform = new Transform3DGroup() { Children = new Transform3DCollection() { element.Transform, new TranslateTransform3D(offset.X, offset.Y, offset.Z) } };
+                element.Transform = element.Transform.AddTransform(new TranslateTransform3D(offset.X, offset.Y, offset.Z));
             }
         }
 
@@ -233,20 +335,7 @@ namespace StackBall
 
         public Model3DGroup GetZones()
         {
-            var result = new Model3DCollection();
-            Action<List<Model3DCollection>> expand = (List<Model3DCollection> collections) =>
-            {
-                foreach (var item in collections)
-                {
-                    foreach (var model in item)
-                    {
-                        result.Add(model);
-                    }
-                }
-            };
-
-            expand(DeadZonesGeometry);
-            expand(HealthZonesGeometry);
+            var result = new Model3DCollection(DeadZonesGeometry.ExpandCollection().Concat(HealthZonesGeometry.ExpandCollection()));
 
             return new Model3DGroup() { Children = result };
         }
@@ -254,10 +343,10 @@ namespace StackBall
         {
             if (!Disposing)
             {
-                Rotate(DeadZonesGeometry);
-                Rotate(HealthZonesGeometry);
+                Rotate(DeadZonesGeometry, Angle);
+                Rotate(HealthZonesGeometry, Angle);
 
-                Angle++;
+                Angle += AngleDelta;
                 Angle = Angle % 360;
             }
             else
@@ -357,10 +446,7 @@ namespace StackBall
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            foreach (var block in Blocks)
-            {
-                block.Dispose();
-            }
+            Blocks[0].Dispose();
         }
     }
 }
