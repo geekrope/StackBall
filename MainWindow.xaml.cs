@@ -19,7 +19,7 @@ namespace StackBall
 {
     public enum BallState
     {
-        Hitting, Jumping
+        Jumping, Hitting
     }
 
     public static class Extentions
@@ -55,17 +55,24 @@ namespace StackBall
 
     public class PlayerBall
     {
-        private Model3DCollection Ball
+        private Point3D OriginalPosition
         {
             get; set;
         }
+        private int JumpFrame;
+        private const int JumpHeight = 1;
+        private const int JumpFrames = 40;
         /// <summary>
         /// Radius count
         /// </summary>
-        public readonly (double, int) BlockSettings = (1, 100);
+        public static readonly (double, int) BlockSettings = (0.2, 100);
         public BallState State
         {
             get; set;
+        }
+        public Model3DCollection Ball
+        {
+            get; private set;
         }
 
         private MeshGeometry3D[] GetSphere(double radius, int count)
@@ -113,7 +120,7 @@ namespace StackBall
                     return new MeshGeometry3D() { Positions = new Point3DCollection(vertices), TriangleIndices = new Int32Collection(indices) };
                 };
 
-                createVertices(1);
+                createVertices(sign);
                 getIndices(0);
 
                 return create3DObject(vertices, indices);
@@ -125,9 +132,29 @@ namespace StackBall
 
             return parts;
         }
-        public PlayerBall()
+        private void SetTransform()
+        {
+            var x = (double)JumpFrame - JumpFrames / 2;
+            var jumpOffset = (-Math.Pow(x / JumpFrames * 2, 2) + 1) * JumpHeight;
+            foreach (var obj in Ball)
+            {
+                obj.Transform = new TranslateTransform3D(OriginalPosition.X, jumpOffset + OriginalPosition.Y, OriginalPosition.Z);
+            }
+        }
+        public PlayerBall(Point3D position)
         {
             Ball = GetSphere(BlockSettings.Item1, BlockSettings.Item2).Merge(new DiffuseMaterial(Brushes.DodgerBlue));
+            State = BallState.Jumping;
+            OriginalPosition = position;
+        }
+        public void Update()
+        {
+            if (State == BallState.Jumping)
+            {
+                SetTransform();
+                JumpFrame++;
+                JumpFrame %= JumpFrames;
+            }
         }
     }
 
@@ -135,7 +162,7 @@ namespace StackBall
     {
         private double OffsetY;
         private bool Disposing;
-        private const double DisposeRadius = 0.25;
+        private const double DisposeRadius = 0.1;
         private const double AngleDelta = 1;
         private double Angle;
         private (int, int)[] deadZones;
@@ -285,12 +312,12 @@ namespace StackBall
             }
         }
 
-        public readonly SolidColorBrush HealthZoneColor = Brushes.LawnGreen;
-        public readonly SolidColorBrush DeadZoneColor = Brushes.DarkRed;
+        public static readonly SolidColorBrush HealthZoneColor = Brushes.LawnGreen;
+        public static readonly SolidColorBrush DeadZoneColor = Brushes.DarkRed;
         /// <summary>
         /// Height, radius, width, count
         /// </summary>
-        public readonly (double, double, double, int) BlockSettings = (0.2, 2, 0.2, 100);
+        public static readonly (double, double, double, int) BlockSettings = (0.2, 2, 0.5, 100);
 
         public (int, int)[] DeadZones
         {
@@ -354,15 +381,15 @@ namespace StackBall
                 for (int index = 0; index < HealthZones.Length; index++)
                 {
                     var zone = HealthZones[index];
-                    var angle = 360 - ToRad(Angle + zone.Item1 + zone.Item2 / 2);
-                    var disposeDirection = new Vector3D(Math.Cos(angle) * DisposeRadius, 0.5 * DisposeRadius, Math.Sin(angle) * DisposeRadius);
+                    var angle = ToRad(360 - Angle + zone.Item1 + zone.Item2 / 2);
+                    var disposeDirection = new Vector3D(Math.Cos(angle) * DisposeRadius, 0 * DisposeRadius, Math.Sin(angle) * DisposeRadius);
                     Translate(HealthZonesGeometry[index], disposeDirection);
                 }
                 for (int index = 0; index < DeadZones.Length; index++)
                 {
                     var zone = DeadZones[index];
-                    var angle = 360 - ToRad(Angle + zone.Item1 + zone.Item2 / 2);
-                    var disposeDirection = new Vector3D(Math.Cos(angle) * DisposeRadius, 0.5 * DisposeRadius, Math.Sin(angle) * DisposeRadius);
+                    var angle = ToRad(360 - Angle + zone.Item1 + zone.Item2 / 2);
+                    var disposeDirection = new Vector3D(Math.Cos(angle) * DisposeRadius, 0 * DisposeRadius, Math.Sin(angle) * DisposeRadius);
                     Translate(DeadZonesGeometry[index], disposeDirection);
                 }
             }
@@ -379,8 +406,10 @@ namespace StackBall
     }
     public partial class MainWindow : Window
     {
+        const double BlockSpot = 0.3;
         DispatcherTimer Timer;
         List<Block> Blocks;
+        PlayerBall Ball;
 
         private void CreateBlocks(int count)
         {
@@ -403,7 +432,7 @@ namespace StackBall
 
                 for (int index = 0; index < bunch; index++)
                 {
-                    var block = new Block((count - remainCount + index) * -0.3);
+                    var block = new Block((count - remainCount + index) * -BlockSpot);
                     if (random.Next(0, 2) == 0)
                     {
                         var deadZone = (random.Next(0, 20), random.Next(40, 60));
@@ -434,6 +463,9 @@ namespace StackBall
             Timer.Start();
 
             CreateBlocks(5);
+
+            Ball = new PlayerBall(new Point3D(0, PlayerBall.BlockSettings.Item1 / 2 + BlockSpot / 2 + 0.05, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2));
+            viewport.Children.Add(new ModelVisual3D() { Content = new Model3DGroup() { Children = Ball.Ball } });
         }
 
         private void OnTick(object sender, EventArgs e)
@@ -442,6 +474,7 @@ namespace StackBall
             {
                 block.Update();
             }
+            Ball.Update();
         }
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)

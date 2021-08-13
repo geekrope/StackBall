@@ -13,7 +13,7 @@
                     <PerspectiveCamera.Transform>
                         <RotateTransform3D>
                             <RotateTransform3D.Rotation>
-                                <AxisAngleRotation3D Axis="1 0 0" Angle="-15"/>
+                                <AxisAngleRotation3D Axis="1 0 0" Angle="-20"/>
                             </RotateTransform3D.Rotation>
                         </RotateTransform3D>
                     </PerspectiveCamera.Transform>
@@ -22,7 +22,7 @@
             <Viewport3D.Children>
                 <ModelVisual3D>
                     <ModelVisual3D.Content>
-                        <DirectionalLight Color="Yellow" Direction="0,0,-10">
+                        <DirectionalLight Color="White" Direction="0,0,-10">
                             <DirectionalLight.Transform>
                                 <RotateTransform3D>
                                     <RotateTransform3D.Rotation>
@@ -32,25 +32,6 @@
                             </DirectionalLight.Transform>
                         </DirectionalLight>
                     </ModelVisual3D.Content>
-                    <!--<ModelVisual3D>
-                        <ModelVisual3D.Content>
-                            <GeometryModel3D x:Name="geom">
-                                <GeometryModel3D.Geometry>
-                                    <MeshGeometry3D/>
-                                </GeometryModel3D.Geometry>
-                                <GeometryModel3D.Material>
-                                    <DiffuseMaterial Brush="Red" />
-                                </GeometryModel3D.Material>
-                                <GeometryModel3D.Transform>
-                                    <RotateTransform3D>
-                                        <RotateTransform3D.Rotation>
-                                            <AxisAngleRotation3D x:Name="rotate" Axis="0 1 0" />
-                                        </RotateTransform3D.Rotation>
-                                    </RotateTransform3D>                                    
-                                </GeometryModel3D.Transform>
-                            </GeometryModel3D>
-                        </ModelVisual3D.Content>
-                    </ModelVisual3D>-->
                 </ModelVisual3D>
             </Viewport3D.Children>
         </Viewport3D>
