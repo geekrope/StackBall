@@ -218,6 +218,10 @@ namespace StackBall
         {
             State = BallState.Hitting;
         }
+        public void Jump()
+        {
+            State = BallState.Jumping;
+        }
         public void Update()
         {
             if (State == BallState.Jumping || (State == BallState.Hitting && JumpFrame != 0))
@@ -237,6 +241,7 @@ namespace StackBall
                 {
                     OnDied?.Invoke();
                 }
+                //Jump();
             }
         }
     }
@@ -563,7 +568,7 @@ namespace StackBall
             Timer.Tick += OnTick;
             Timer.Start();
 
-            CreateBlocks(50);
+            CreateBlocks(6);
             CurrentBlock = Blocks[0];
 
             Ball = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + BlockSpot / 2, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
@@ -583,9 +588,11 @@ namespace StackBall
             var position = (Point3D)viewport.Camera.GetValue(ProjectionCamera.PositionProperty);
             if (position.Y > CurrentBlock.OffsetY)
             {
-                var delta = Math.Max(CurrentBlock.OffsetY - position.Y, -0.05);
-                viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(position.X, position.Y + delta, position.Z));
-                Ball.OffsetY += delta;
+                //var delta = Math.Max(CurrentBlock.OffsetY - position.Y, -0.2);
+                //viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(position.X, position.Y + delta, position.Z));
+                //Ball.OffsetY += delta;
+                viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(position.X, CurrentBlock.OffsetY, position.Z));
+                Ball.OffsetY += CurrentBlock.OffsetY - position.Y;
             }
         }
 
@@ -597,6 +604,11 @@ namespace StackBall
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             Ball.Hit();
+        }
+
+        private void Window_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            Ball.Jump();
         }
     }
 }
