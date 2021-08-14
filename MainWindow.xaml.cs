@@ -51,6 +51,23 @@ namespace StackBall
             }
             return collection;
         }
+        public static double NormalizeAngle(double angle)
+        {
+            angle %= 360;
+            if (angle < 0)
+            {
+                angle += 360;
+            }
+            return angle;
+        }
+        public static double DegreesToRadians(double angle)
+        {
+            return angle / 180 * Math.PI;
+        }
+        public static double RadiansToDegrees(double angle)
+        {
+            return angle / Math.PI * 180;
+        }
     }
 
     public class PlayerBall
@@ -65,7 +82,7 @@ namespace StackBall
         /// <summary>
         /// Radius count
         /// </summary>
-        public static readonly (double, int) BlockSettings = (0.2, 100);
+        public static readonly (double, int) BallSettings = (0.2, 100);
         public BallState State
         {
             get; set;
@@ -73,6 +90,14 @@ namespace StackBall
         public Model3DCollection Ball
         {
             get; private set;
+        }
+        public double OffsetY
+        {
+            get; set;
+        }
+        public Block CurrentBlock
+        {
+            get; set;
         }
 
         private MeshGeometry3D[] GetSphere(double radius, int count)
@@ -138,33 +163,74 @@ namespace StackBall
             var jumpOffset = (-Math.Pow(x / JumpFrames * 2, 2) + 1) * JumpHeight;
             foreach (var obj in Ball)
             {
-                obj.Transform = new TranslateTransform3D(OriginalPosition.X, jumpOffset + OriginalPosition.Y, OriginalPosition.Z);
+                obj.Transform = new TranslateTransform3D(OriginalPosition.X, jumpOffset + OriginalPosition.Y + OffsetY, OriginalPosition.Z);
             }
         }
-        public PlayerBall(Point3D position)
+        private bool AngleInArc(double startAngle, double sweepAngle, double angle)
         {
-            Ball = GetSphere(BlockSettings.Item1, BlockSettings.Item2).Merge(new DiffuseMaterial(Brushes.DodgerBlue));
+            if (startAngle + sweepAngle > 360) //Arc goes through 0 deg
+            {
+                var arc1 = (startAngle, 360 - startAngle);
+                var arc2 = (0, Extentions.NormalizeAngle(startAngle + sweepAngle));
+                return AngleInArc(arc1.Item1, arc1.Item2, angle) || AngleInArc(arc2.Item1, arc2.Item2, angle);
+            }
+            else
+            {
+                return angle > startAngle && angle - startAngle < sweepAngle;
+            }
+        }
+        public bool CanHit()
+        {
+            var z = Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2;
+            var x1 = BallSettings.Item1 / 2;
+            var x2 = -BallSettings.Item1 / 2;
+            var angularDistance = (Extentions.NormalizeAngle(Extentions.RadiansToDegrees(Math.Atan2(z, x1))),
+                Extentions.NormalizeAngle(Extentions.RadiansToDegrees(Math.Atan2(z, x2))));
+            var canHit = true;
+            foreach (var deadZone in CurrentBlock.DeadZones)
+            {
+                var angle = Extentions.NormalizeAngle(deadZone.Item1 + CurrentBlock.Angle);
+
+                if (AngleInArc(angle, deadZone.Item2, angularDistance.Item1) || AngleInArc(angle, deadZone.Item2, angularDistance.Item2))
+                {
+                    canHit = false;
+                }
+            }
+            return canHit;
+        }
+
+        public PlayerBall(Point3D position, Block currentBlock)
+        {
+            Ball = GetSphere(BallSettings.Item1, BallSettings.Item2).Merge(new DiffuseMaterial(Brushes.DodgerBlue));
             State = BallState.Jumping;
             OriginalPosition = position;
+            CurrentBlock = currentBlock;
+        }
+        public void Hit()
+        {
+            State = BallState.Hitting;
         }
         public void Update()
         {
-            if (State == BallState.Jumping)
+            if (State == BallState.Jumping || (State == BallState.Hitting && JumpFrame != 0))
             {
                 SetTransform();
                 JumpFrame++;
                 JumpFrame %= JumpFrames;
+            }
+            else if (State == BallState.Hitting)
+            {
+
             }
         }
     }
 
     public class Block
     {
-        private double OffsetY;
         private bool Disposing;
-        private const double DisposeRadius = 0.1;
-        private const double AngleDelta = 1;
-        private double Angle;
+        private double DisposeRadius = 0;
+        private const double DisposeRadiusDelta = 0.2;
+        private const double AngleDelta = 0.3;
         private (int, int)[] deadZones;
         private List<Model3DCollection> DeadZonesGeometry
         {
@@ -189,10 +255,6 @@ namespace StackBall
                 }
             }
         }
-        private double ToRad(double angle)
-        {
-            return angle / 180 * Math.PI;
-        }
         private void CreateGraphics()
         {
             DeadZonesGeometry = new List<Model3DCollection>();
@@ -200,7 +262,7 @@ namespace StackBall
 
             Func<double, double, Brush, Model3DCollection> createZone = (double startAngle, double sweepAngle, Brush color) =>
                {
-                   var arc = GetArc(BlockSettings.Item1, BlockSettings.Item2, ToRad(startAngle), ToRad(sweepAngle), BlockSettings.Item3, BlockSettings.Item4);
+                   var arc = GetArc(BlockSettings.Item1, BlockSettings.Item2, Extentions.DegreesToRadians(startAngle), Extentions.DegreesToRadians(sweepAngle), BlockSettings.Item3, BlockSettings.Item4);
                    return arc.Merge(new DiffuseMaterial(color));
                };
 
@@ -300,7 +362,7 @@ namespace StackBall
             {
                 foreach (var obj in model)
                 {
-                    obj.Transform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), angle));
+                    obj.Transform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -angle));
                 }
             }
         }
@@ -308,7 +370,9 @@ namespace StackBall
         {
             foreach (var element in collection)
             {
-                element.Transform = element.Transform.AddTransform(new TranslateTransform3D(offset.X, offset.Y, offset.Z));
+                //element.Transform.Value.Append(new Matrix3D() { OffsetX = offset.X, OffsetY = offset.Y, OffsetZ = offset.Z });
+                //element.Transform = element.Transform.AddTransform(new TranslateTransform3D(offset.X, offset.Y, offset.Z));
+                element.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -Angle)), new TranslateTransform3D(offset.X, offset.Y, offset.Z) }) };
             }
         }
 
@@ -359,6 +423,14 @@ namespace StackBall
         {
             get; private set;
         }
+        public double OffsetY
+        {
+            get; private set;
+        }
+        public double Angle
+        {
+            get; private set;
+        }
 
         public Model3DGroup GetZones()
         {
@@ -381,17 +453,18 @@ namespace StackBall
                 for (int index = 0; index < HealthZones.Length; index++)
                 {
                     var zone = HealthZones[index];
-                    var angle = ToRad(360 - Angle + zone.Item1 + zone.Item2 / 2);
+                    var angle = Extentions.DegreesToRadians(Angle + zone.Item1 + zone.Item2 / 2);
                     var disposeDirection = new Vector3D(Math.Cos(angle) * DisposeRadius, 0 * DisposeRadius, Math.Sin(angle) * DisposeRadius);
                     Translate(HealthZonesGeometry[index], disposeDirection);
                 }
                 for (int index = 0; index < DeadZones.Length; index++)
                 {
                     var zone = DeadZones[index];
-                    var angle = ToRad(360 - Angle + zone.Item1 + zone.Item2 / 2);
+                    var angle = Extentions.DegreesToRadians(Angle + zone.Item1 + zone.Item2 / 2);
                     var disposeDirection = new Vector3D(Math.Cos(angle) * DisposeRadius, 0 * DisposeRadius, Math.Sin(angle) * DisposeRadius);
                     Translate(DeadZonesGeometry[index], disposeDirection);
                 }
+                DisposeRadius += DisposeRadiusDelta;
             }
         }
         public void Dispose()
@@ -410,6 +483,7 @@ namespace StackBall
         DispatcherTimer Timer;
         List<Block> Blocks;
         PlayerBall Ball;
+        Block CurrentBlock;
 
         private void CreateBlocks(int count)
         {
@@ -453,6 +527,17 @@ namespace StackBall
             }
         }
 
+        private void HitBlock()
+        {
+            var index = Blocks.IndexOf(CurrentBlock);
+            CurrentBlock.Dispose();
+            if (index + 1 < Blocks.Count)
+            {
+                CurrentBlock = Blocks[index + 1];
+            }
+            Ball.CurrentBlock = CurrentBlock;
+        }
+
         public MainWindow()
         {
             InitializeComponent();
@@ -463,8 +548,9 @@ namespace StackBall
             Timer.Start();
 
             CreateBlocks(5);
+            CurrentBlock = Blocks[0];
 
-            Ball = new PlayerBall(new Point3D(0, PlayerBall.BlockSettings.Item1 / 2 + BlockSpot / 2 + 0.05, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2));
+            Ball = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + BlockSpot / 2, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
             viewport.Children.Add(new ModelVisual3D() { Content = new Model3DGroup() { Children = Ball.Ball } });
         }
 
@@ -475,11 +561,29 @@ namespace StackBall
                 block.Update();
             }
             Ball.Update();
+
+            var position = (Point3D)viewport.Camera.GetValue(ProjectionCamera.PositionProperty);
+            if (position.Y > CurrentBlock.OffsetY)
+            {
+                var delta = Math.Max(CurrentBlock.OffsetY - position.Y, -0.05);
+                viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(position.X, position.Y + delta, position.Z));
+                Ball.OffsetY += delta;
+            }
+            debug.Content = Ball.CanHit();
+            //debug.Content = Math.Floor(Extentions.NormalizeAngle(CurrentBlock.DeadZones[0].Item1 + CurrentBlock.Angle));
         }
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            Blocks[0].Dispose();
+
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (Ball.CanHit())
+            {
+                HitBlock();
+            }
         }
     }
 }
