@@ -5,11 +5,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:StackBall"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800" MouseDown="Window_MouseDown" PreviewKeyDown="Window_PreviewKeyDown" PreviewKeyUp="Window_PreviewKeyUp" MouseMove="Window_MouseMove">
+        Title="MainWindow" Height="450" Width="800" MouseDown="Window_MouseDown" PreviewKeyDown="Window_PreviewKeyDown" PreviewKeyUp="Window_PreviewKeyUp" MouseMove="Window_MouseMove" SizeChanged="Window_SizeChanged">
     <Grid>
-        <Viewport3D Name="viewport" ClipToBounds="False" IsHitTestVisible="False">
+        <Viewport3D Name="viewport" SnapsToDevicePixels="True" Width="800" Height="433" >
             <Viewport3D.Camera>
-                <PerspectiveCamera Position="0,0,10" LookDirection="0,0,-1" FarPlaneDistance="20" UpDirection="0,1,0" FieldOfView="45">
+                <PerspectiveCamera Position="0,0,10" LookDirection="0,0,-1">
                     <PerspectiveCamera.Transform>
                         <RotateTransform3D>
                             <RotateTransform3D.Rotation>

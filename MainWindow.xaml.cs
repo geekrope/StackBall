@@ -501,8 +501,10 @@ namespace StackBall
     public partial class MainWindow : Window
     {
         const double BlockSpot = 0.3;
+        const int BlocksBunch = 7;
         DispatcherTimer Timer;
         List<Block> Blocks;
+        List<Block> VisualizedBlocks;
         PlayerBall Ball;
         Block CurrentBlock;
 
@@ -540,7 +542,6 @@ namespace StackBall
                         block.DeadZones = new (int, int)[] { deadZone, deadZone2 };
                     }
 
-                    viewport.Children.Add(new ModelVisual3D() { Content = block.GetZones() });
                     Blocks.Add(block);
                 }
 
@@ -555,6 +556,11 @@ namespace StackBall
             if (index + 1 < Blocks.Count)
             {
                 CurrentBlock = Blocks[index + 1];
+                if (index + 1 + BlocksBunch < Blocks.Count)
+                {
+                    VisualizedBlocks.Add(Blocks[index + 1 + BlocksBunch]);
+                    viewport.Children.Add(new ModelVisual3D() { Content = Blocks[index + 1 + BlocksBunch].GetZones() });
+                }
             }
             Ball.CurrentBlock = CurrentBlock;
         }
@@ -568,8 +574,15 @@ namespace StackBall
             Timer.Tick += OnTick;
             Timer.Start();
 
-            CreateBlocks(6);
+            CreateBlocks(4000);
             CurrentBlock = Blocks[0];
+
+            VisualizedBlocks = new List<Block>();
+            for (int index = 0; index < BlocksBunch; index++)
+            {
+                VisualizedBlocks.Add(Blocks[index]);
+                viewport.Children.Add(new ModelVisual3D() { Content = Blocks[index].GetZones() });
+            }
 
             Ball = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + BlockSpot / 2, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
             viewport.Children.Add(new ModelVisual3D() { Content = new Model3DGroup() { Children = Ball.Ball } });
@@ -579,7 +592,7 @@ namespace StackBall
 
         private void OnTick(object sender, EventArgs e)
         {
-            foreach (var block in Blocks)
+            foreach (var block in VisualizedBlocks)
             {
                 block.Update();
             }
@@ -617,7 +630,12 @@ namespace StackBall
             {
                 var angle = (e.GetPosition(this).Y - ActualHeight / 2) / ActualHeight * 180;
                 viewport.Camera.Transform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), angle));
-            }           
+            }
+        }
+
+        private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+
         }
     }
 }
