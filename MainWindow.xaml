@@ -13,7 +13,7 @@
                     <PerspectiveCamera.Transform>
                         <RotateTransform3D>
                             <RotateTransform3D.Rotation>
-                                <AxisAngleRotation3D Axis="1 0 0" Angle="-90"/>
+                                <AxisAngleRotation3D Axis="1 0 0" Angle="-20"/>
                             </RotateTransform3D.Rotation>
                         </RotateTransform3D>
                     </PerspectiveCamera.Transform>
@@ -49,11 +49,11 @@
                         </GeometryModel3D>
                     </ModelVisual3D.Content>
                     <ModelVisual3D.Transform>
-                        <RotateTransform3D>
-                            <RotateTransform3D.Rotation>
-                                <AxisAngleRotation3D Axis="0 1 0" />
-                            </RotateTransform3D.Rotation>
-                        </RotateTransform3D>
+                        <TranslateTransform3D>
+                            <TranslateTransform3D.OffsetY>
+                                10
+                            </TranslateTransform3D.OffsetY>
+                        </TranslateTransform3D>
                     </ModelVisual3D.Transform>
                 </ModelVisual3D>
             </Viewport3D.Children>

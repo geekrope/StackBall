@@ -99,6 +99,14 @@ namespace StackBall
         {
             get; set;
         }
+        public Action OnHit
+        {
+            get; set;
+        }
+        public Action OnDied
+        {
+            get; set;
+        }
 
         private MeshGeometry3D[] GetSphere(double radius, int count)
         {
@@ -179,7 +187,7 @@ namespace StackBall
                 return angle > startAngle && angle - startAngle < sweepAngle;
             }
         }
-        public bool CanHit()
+        private bool CanHit()
         {
             var z = Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2;
             var x1 = BallSettings.Item1 / 2;
@@ -220,7 +228,15 @@ namespace StackBall
             }
             else if (State == BallState.Hitting)
             {
-
+                SetTransform();
+                if (CanHit())
+                {
+                    OnHit?.Invoke();
+                }
+                else
+                {
+                    OnDied?.Invoke();
+                }
             }
         }
     }
@@ -230,7 +246,7 @@ namespace StackBall
         private bool Disposing;
         private double DisposeRadius = 0;
         private const double DisposeRadiusDelta = 0.2;
-        private const double AngleDelta = 0.3;
+        private const double AngleDelta = 1;
         private (int, int)[] deadZones;
         private List<Model3DCollection> DeadZonesGeometry
         {
@@ -547,11 +563,13 @@ namespace StackBall
             Timer.Tick += OnTick;
             Timer.Start();
 
-            CreateBlocks(5);
+            CreateBlocks(50);
             CurrentBlock = Blocks[0];
 
             Ball = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + BlockSpot / 2, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
             viewport.Children.Add(new ModelVisual3D() { Content = new Model3DGroup() { Children = Ball.Ball } });
+
+            Ball.OnHit = HitBlock;
         }
 
         private void OnTick(object sender, EventArgs e)
@@ -569,8 +587,6 @@ namespace StackBall
                 viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(position.X, position.Y + delta, position.Z));
                 Ball.OffsetY += delta;
             }
-            debug.Content = Ball.CanHit();
-            //debug.Content = Math.Floor(Extentions.NormalizeAngle(CurrentBlock.DeadZones[0].Item1 + CurrentBlock.Angle));
         }
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
@@ -580,10 +596,7 @@ namespace StackBall
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (Ball.CanHit())
-            {
-                HitBlock();
-            }
+            Ball.Hit();
         }
     }
 }
