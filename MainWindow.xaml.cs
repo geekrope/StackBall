@@ -82,7 +82,7 @@ namespace StackBall
         /// <summary>
         /// Radius count
         /// </summary>
-        public static readonly (double, int) BallSettings = (0.2, 100);
+        public static readonly (double, int) BallSettings = (0.2, 20);
         public BallState State
         {
             get; set;
@@ -609,6 +609,15 @@ namespace StackBall
         private void Window_PreviewKeyUp(object sender, KeyEventArgs e)
         {
             Ball.Jump();
+        }
+
+        private void Window_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                var angle = (e.GetPosition(this).Y - ActualHeight / 2) / ActualHeight * 180;
+                viewport.Camera.Transform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), angle));
+            }           
         }
     }
 }
