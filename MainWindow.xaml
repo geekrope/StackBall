@@ -7,13 +7,13 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800" MouseDown="Window_MouseDown" MouseUp="Window_MouseUp">
     <Grid>
-        <Viewport3D Name="viewport" SnapsToDevicePixels="True">
+        <Viewport3D Name="viewport" ClipToBounds="False" IsHitTestVisible="False" SnapsToDevicePixels="True">
             <Viewport3D.Camera>
-                <PerspectiveCamera Position="0,0,10" LookDirection="0,0,-1" FieldOfView="45">
+                <PerspectiveCamera Position="0,0,20" LookDirection="0,0,-1" FieldOfView="45">
                     <PerspectiveCamera.Transform>
                         <RotateTransform3D>
                             <RotateTransform3D.Rotation>
-                                <AxisAngleRotation3D Axis="1 0 0" Angle="-20"/>
+                                <AxisAngleRotation3D Axis="1 0 0" Angle="-10"/>
                             </RotateTransform3D.Rotation>
                         </RotateTransform3D>
                     </PerspectiveCamera.Transform>
@@ -35,10 +35,16 @@
                 </ModelVisual3D>
                 <ModelVisual3D>
                     <ModelVisual3D.Content>
-                        <DirectionalLight Color="White" Direction="0,-1,0">                            
+                        <DirectionalLight Color="White" Direction="0,-1,0">
                         </DirectionalLight>
                     </ModelVisual3D.Content>
                 </ModelVisual3D>
+                <Viewport2DVisual3D>
+                    <Viewport2DVisual3D.Material>
+                        <DiffuseMaterial Viewport2DVisual3D.IsVisualHostMaterial="True" Brush="White"/>
+                    </Viewport2DVisual3D.Material>
+                    <Image Width="200" Height="200" Source="Resources/spot.png"/>
+                </Viewport2DVisual3D>
             </Viewport3D.Children>
         </Viewport3D>
         <Label Name="debug" Content="Label" HorizontalAlignment="Left" Margin="22,30,0,0" VerticalAlignment="Top"/>

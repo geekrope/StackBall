@@ -77,7 +77,7 @@ namespace StackBall
             get; set;
         }
         private int JumpFrame;
-        private int Frame = 0;
+        private int Tick = 0;
         private const int JumpHeight = 1;
         private const int JumpFrames = 40;
         /// <summary>
@@ -108,6 +108,7 @@ namespace StackBall
         {
             get; set;
         }
+        public const int TimeOffset = 5;
 
         private MeshGeometry3D[] GetSphere(double radius, int count)
         {
@@ -170,9 +171,22 @@ namespace StackBall
         {
             var x = (double)JumpFrame - JumpFrames / 2;
             var jumpOffset = (-Math.Pow(x / JumpFrames * 2, 2) + 1) * JumpHeight;
+
+            var delta = 0.3;
+            var scale = 1 - (double)(JumpFrame - JumpFrames / 2) / JumpFrames * 2 * delta;
+            if (State == BallState.Hitting)
+            {
+                scale = 1;
+            }
+
             foreach (var obj in Ball)
             {
-                obj.Transform = new TranslateTransform3D(OriginalPosition.X, jumpOffset + OriginalPosition.Y + OffsetY, OriginalPosition.Z);
+                obj.Transform = new Transform3DGroup()
+                {
+                    Children = new Transform3DCollection(new Transform3D[] { new TranslateTransform3D(OriginalPosition.X, jumpOffset + OriginalPosition.Y + OffsetY, OriginalPosition.Z),
+                        new ScaleTransform3D(1, scale, 1)
+                    })
+                };
             }
         }
         private bool AngleInArc(double startAngle, double sweepAngle, double angle)
@@ -188,7 +202,8 @@ namespace StackBall
                 return angle > startAngle && angle - startAngle < sweepAngle;
             }
         }
-        private bool CanHit()
+
+        public bool CanHit()
         {
             var z = Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2;
             var x1 = BallSettings.Item1 / 2;
@@ -207,7 +222,6 @@ namespace StackBall
             }
             return canHit;
         }
-
         public PlayerBall(Point3D position, Block currentBlock)
         {
             Ball = GetSphere(BallSettings.Item1, BallSettings.Item2).Merge(new DiffuseMaterial(Brushes.DodgerBlue));
@@ -234,7 +248,7 @@ namespace StackBall
             else if (State == BallState.Hitting)
             {
                 SetTransform();
-                if (Frame == 5)
+                if (Tick == TimeOffset)
                 {
                     if (CanHit())
                     {
@@ -244,11 +258,11 @@ namespace StackBall
                     {
                         OnDie?.Invoke();
                     }
-                    Frame = 0;
+                    Tick = 0;
                 }
                 else
                 {
-                    Frame++;
+                    Tick++;
                 }
             }
         }
@@ -480,9 +494,6 @@ namespace StackBall
             {
                 Rotate(DeadZonesGeometry, Angle);
                 Rotate(HealthZonesGeometry, Angle);
-
-                Angle += AngleDelta;
-                Angle = Angle % 360;
             }
             else
             {
@@ -511,6 +522,14 @@ namespace StackBall
         {
             Disposing = true;
         }
+        public void IncreaseAngle(double delta = AngleDelta)
+        {
+            if(!Disposing)
+            {
+                Angle += delta;
+                Angle = Angle % 360;
+            }            
+        }
 
         public Block(double offset)
         {
@@ -538,23 +557,26 @@ namespace StackBall
             var random = new Random();
             for (; remainCount > 0;)
             {
-                var bunch = 10;
+                var bunch = Math.Min(remainCount, random.Next(1, 30));
+                var blocksCount = random.Next(2, 4);
+                var deadZone = (random.Next(0, 20), random.Next(40, 110));
+                var deadZone2 = (random.Next(150, 170), random.Next(40, 50));
+                var deadZone3 = (random.Next(250, 300), random.Next(20, 30));
 
                 for (int index = 0; index < bunch; index++)
                 {
                     var block = new Block(Blocks.Count * -BlockSpot);
-                    if (random.Next(0, 2) == 0)
+                    if (blocksCount == 2)
                     {
-                        var deadZone = (random.Next(0, 20), random.Next(40, 60));
-                        block.DeadZones = new (int, int)[] { deadZone };
-                    }
-                    else
-                    {
-                        var deadZone = (random.Next(0, 20), random.Next(40, 60));
-                        var deadZone2 = (random.Next(100, 130), random.Next(160, 200));
                         block.DeadZones = new (int, int)[] { deadZone, deadZone2 };
                     }
+                    else if (blocksCount == 3)
+                    {
+                        block.DeadZones = new (int, int)[] { deadZone, deadZone2, deadZone3 };
+                    }
+
                     block.Disposed = RemoveBlock;
+                    block.IncreaseAngle(PlayerBall.TimeOffset * index);
 
                     Blocks.Add(block);
                 }
@@ -622,16 +644,32 @@ namespace StackBall
             Ball.OnHit = HitBlock;
             Ball.OnDie = OnDie;
 
-            viewport.Camera.SetValue(ProjectionCamera.FarPlaneDistanceProperty, ZDepth*2);
+            viewport.Camera.SetValue(ProjectionCamera.FarPlaneDistanceProperty, ZDepth * 2);
             viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(0, 0, ZDepth));
         }
 
         private void OnTick(object sender, EventArgs e)
         {
+            if (Ball.State != BallState.Hitting)
+            {
+                foreach (var block in Blocks)
+                {
+                    block.IncreaseAngle();
+                }
+            }
+            else
+            {
+                foreach (var block in Blocks)
+                {
+                    block.IncreaseAngle(0.2);
+                }
+            }
+
             foreach (var block in VisualizedBlocks)
             {
                 block.Update();
             }
+
             for (; BlocksToRemove.Count != 0;)
             {
                 var block = BlocksToRemove[0];
@@ -640,6 +678,8 @@ namespace StackBall
                 viewport.Children.Remove(block.GetZones());
             }
             Ball.Update();
+
+            debug.Content = Ball.CanHit();
         }
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
