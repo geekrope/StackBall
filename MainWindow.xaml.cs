@@ -77,6 +77,7 @@ namespace StackBall
             get; set;
         }
         private int JumpFrame;
+        private int Frame = 0;
         private const int JumpHeight = 1;
         private const int JumpFrames = 40;
         /// <summary>
@@ -103,7 +104,7 @@ namespace StackBall
         {
             get; set;
         }
-        public Action OnDied
+        public Action OnDie
         {
             get; set;
         }
@@ -233,15 +234,22 @@ namespace StackBall
             else if (State == BallState.Hitting)
             {
                 SetTransform();
-                if (CanHit())
+                if (Frame == 5)
                 {
-                    OnHit?.Invoke();
+                    if (CanHit())
+                    {
+                        OnHit?.Invoke();
+                    }
+                    else
+                    {
+                        OnDie?.Invoke();
+                    }
+                    Frame = 0;
                 }
                 else
                 {
-                    OnDied?.Invoke();
+                    Frame++;
                 }
-                //Jump();
             }
         }
     }
@@ -250,7 +258,7 @@ namespace StackBall
     {
         private bool Disposing;
         private double DisposeRadius = 0;
-        private const double DisposeRadiusDelta = 0.2;
+        private const double DisposeRadiusDelta = 0.5;
         private const double AngleDelta = 1;
         private (int, int)[] deadZones;
         private List<Model3DCollection> DeadZonesGeometry
@@ -258,6 +266,10 @@ namespace StackBall
             get; set;
         }
         private List<Model3DCollection> HealthZonesGeometry
+        {
+            get; set;
+        }
+        private ModelVisual3D Zones
         {
             get; set;
         }
@@ -296,6 +308,9 @@ namespace StackBall
             {
                 DeadZonesGeometry.Add(createZone(deadZone.Item1, deadZone.Item2, DeadZoneColor));
             }
+
+            var modelsCollection = new Model3DCollection(DeadZonesGeometry.ExpandCollection().Concat(HealthZonesGeometry.ExpandCollection()));
+            Zones = new ModelVisual3D() { Content = new Model3DGroup() { Children = modelsCollection } };
         }
         /// <summary>
         /// Gets point of the given arc
@@ -333,17 +348,17 @@ namespace StackBall
                     var x2 = Math.Cos(angle) * (radius - width);
                     var z2 = Math.Sin(angle) * (radius - width);
 
-                    verticesTop[index] = new Point3D(x, height / 2 + OffsetY, z);
-                    verticesTop[index + 1] = new Point3D(x2, height / 2 + OffsetY, z2);
+                    verticesTop[index] = new Point3D(x, height / 2, z);
+                    verticesTop[index + 1] = new Point3D(x2, height / 2, z2);
 
-                    verticesBottom[index] = new Point3D(x, -height / 2 + OffsetY, z);
-                    verticesBottom[index + 1] = new Point3D(x2, -height / 2 + OffsetY, z2);
+                    verticesBottom[index] = new Point3D(x, -height / 2, z);
+                    verticesBottom[index + 1] = new Point3D(x2, -height / 2, z2);
 
-                    verticesFront[index] = new Point3D(x, -height / 2 + OffsetY, z);
-                    verticesFront[index + 1] = new Point3D(x, height / 2 + OffsetY, z);
+                    verticesFront[index] = new Point3D(x, -height / 2, z);
+                    verticesFront[index + 1] = new Point3D(x, height / 2, z);
 
-                    verticesBack[index] = new Point3D(x2, -height / 2 + OffsetY, z2);
-                    verticesBack[index + 1] = new Point3D(x2, height / 2 + OffsetY, z2);
+                    verticesBack[index] = new Point3D(x2, -height / 2, z2);
+                    verticesBack[index + 1] = new Point3D(x2, height / 2, z2);
                 }
             };
 
@@ -383,7 +398,7 @@ namespace StackBall
             {
                 foreach (var obj in model)
                 {
-                    obj.Transform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -angle));
+                    obj.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -Angle)), new TranslateTransform3D(0, OffsetY, 0) }) };
                 }
             }
         }
@@ -391,9 +406,7 @@ namespace StackBall
         {
             foreach (var element in collection)
             {
-                //element.Transform.Value.Append(new Matrix3D() { OffsetX = offset.X, OffsetY = offset.Y, OffsetZ = offset.Z });
-                //element.Transform = element.Transform.AddTransform(new TranslateTransform3D(offset.X, offset.Y, offset.Z));
-                element.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -Angle)), new TranslateTransform3D(offset.X, offset.Y, offset.Z) }) };
+                element.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -Angle)), new TranslateTransform3D(offset.X, offset.Y + OffsetY + 0.5, offset.Z) }) };
             }
         }
 
@@ -403,6 +416,10 @@ namespace StackBall
         /// Height, radius, width, count
         /// </summary>
         public static readonly (double, double, double, int) BlockSettings = (0.2, 2, 0.5, 100);
+        public Action<Block> Disposed
+        {
+            get; set;
+        }
 
         public (int, int)[] DeadZones
         {
@@ -424,9 +441,9 @@ namespace StackBall
                     {
                         var angle = currentAngle;
                         var angle2 = deadZones[index].Item1;
-                        currentAngle = deadZones[index].Item1 + deadZones[index].Item2;
                         healthZones.Add((angle, angle2 - angle));
                     }
+                    currentAngle = deadZones[index].Item1 + deadZones[index].Item2;
 
                     var start = deadZones[deadZones.Length - 1].Item1 + deadZones[deadZones.Length - 1].Item2;
                     if (index == deadZones.Length - 1 && start != 360)
@@ -446,18 +463,16 @@ namespace StackBall
         }
         public double OffsetY
         {
-            get; private set;
+            get; set;
         }
         public double Angle
         {
             get; private set;
         }
 
-        public Model3DGroup GetZones()
+        public ModelVisual3D GetZones()
         {
-            var result = new Model3DCollection(DeadZonesGeometry.ExpandCollection().Concat(HealthZonesGeometry.ExpandCollection()));
-
-            return new Model3DGroup() { Children = result };
+            return Zones;
         }
         public void Update()
         {
@@ -486,6 +501,10 @@ namespace StackBall
                     Translate(DeadZonesGeometry[index], disposeDirection);
                 }
                 DisposeRadius += DisposeRadiusDelta;
+                if (DisposeRadius > MainWindow.ZDepth)
+                {
+                    Disposed?.Invoke(this);
+                }
             }
         }
         public void Dispose()
@@ -500,11 +519,14 @@ namespace StackBall
     }
     public partial class MainWindow : Window
     {
+        public const double ZDepth = 10;
         const double BlockSpot = 0.3;
-        const int BlocksBunch = 7;
+        const int BlocksBunch = 8;
+        int CurrentBlockIndex = 0;
         DispatcherTimer Timer;
         List<Block> Blocks;
         List<Block> VisualizedBlocks;
+        List<Block> BlocksToRemove;
         PlayerBall Ball;
         Block CurrentBlock;
 
@@ -516,20 +538,11 @@ namespace StackBall
             var random = new Random();
             for (; remainCount > 0;)
             {
-                var bunch = 0;
-
-                if (remainCount > 2)
-                {
-                    bunch = random.Next(2, remainCount);
-                }
-                else
-                {
-                    bunch = 1;
-                }
+                var bunch = 10;
 
                 for (int index = 0; index < bunch; index++)
                 {
-                    var block = new Block((count - remainCount + index) * -BlockSpot);
+                    var block = new Block(Blocks.Count * -BlockSpot);
                     if (random.Next(0, 2) == 0)
                     {
                         var deadZone = (random.Next(0, 20), random.Next(40, 60));
@@ -541,6 +554,7 @@ namespace StackBall
                         var deadZone2 = (random.Next(100, 130), random.Next(160, 200));
                         block.DeadZones = new (int, int)[] { deadZone, deadZone2 };
                     }
+                    block.Disposed = RemoveBlock;
 
                     Blocks.Add(block);
                 }
@@ -551,18 +565,34 @@ namespace StackBall
 
         private void HitBlock()
         {
-            var index = Blocks.IndexOf(CurrentBlock);
             CurrentBlock.Dispose();
-            if (index + 1 < Blocks.Count)
+            CurrentBlock.Update();
+            if (CurrentBlockIndex + 1 < Blocks.Count)
             {
-                CurrentBlock = Blocks[index + 1];
-                if (index + 1 + BlocksBunch < Blocks.Count)
+                CurrentBlockIndex++;
+                CurrentBlock = Blocks[CurrentBlockIndex];
+                foreach (var block in Blocks)
                 {
-                    VisualizedBlocks.Add(Blocks[index + 1 + BlocksBunch]);
-                    viewport.Children.Add(new ModelVisual3D() { Content = Blocks[index + 1 + BlocksBunch].GetZones() });
+                    block.OffsetY += BlockSpot;
+                }
+
+                if (CurrentBlockIndex + BlocksBunch < Blocks.Count)
+                {
+                    VisualizedBlocks.Add(Blocks[CurrentBlockIndex + BlocksBunch - 1]);
+                    viewport.Children.Add(Blocks[CurrentBlockIndex + BlocksBunch - 1].GetZones());
                 }
             }
             Ball.CurrentBlock = CurrentBlock;
+        }
+
+        private void RemoveBlock(Block block)
+        {
+            BlocksToRemove.Add(block);
+        }
+
+        private void OnDie()
+        {
+            Timer.Stop();
         }
 
         public MainWindow()
@@ -574,6 +604,8 @@ namespace StackBall
             Timer.Tick += OnTick;
             Timer.Start();
 
+            BlocksToRemove = new List<Block>();
+
             CreateBlocks(4000);
             CurrentBlock = Blocks[0];
 
@@ -581,13 +613,17 @@ namespace StackBall
             for (int index = 0; index < BlocksBunch; index++)
             {
                 VisualizedBlocks.Add(Blocks[index]);
-                viewport.Children.Add(new ModelVisual3D() { Content = Blocks[index].GetZones() });
+                viewport.Children.Add(Blocks[index].GetZones());
             }
 
-            Ball = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + BlockSpot / 2, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
+            Ball = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + Block.BlockSettings.Item1, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
             viewport.Children.Add(new ModelVisual3D() { Content = new Model3DGroup() { Children = Ball.Ball } });
 
             Ball.OnHit = HitBlock;
+            Ball.OnDie = OnDie;
+
+            viewport.Camera.SetValue(ProjectionCamera.FarPlaneDistanceProperty, ZDepth*2);
+            viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(0, 0, ZDepth));
         }
 
         private void OnTick(object sender, EventArgs e)
@@ -596,46 +632,24 @@ namespace StackBall
             {
                 block.Update();
             }
-            Ball.Update();
-
-            var position = (Point3D)viewport.Camera.GetValue(ProjectionCamera.PositionProperty);
-            if (position.Y > CurrentBlock.OffsetY)
+            for (; BlocksToRemove.Count != 0;)
             {
-                //var delta = Math.Max(CurrentBlock.OffsetY - position.Y, -0.2);
-                //viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(position.X, position.Y + delta, position.Z));
-                //Ball.OffsetY += delta;
-                viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(position.X, CurrentBlock.OffsetY, position.Z));
-                Ball.OffsetY += CurrentBlock.OffsetY - position.Y;
+                var block = BlocksToRemove[0];
+                VisualizedBlocks.Remove(block);
+                BlocksToRemove.Remove(block);
+                viewport.Children.Remove(block.GetZones());
             }
+            Ball.Update();
         }
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-
-        }
-
-        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
             Ball.Hit();
         }
 
-        private void Window_PreviewKeyUp(object sender, KeyEventArgs e)
+        private void Window_MouseUp(object sender, MouseButtonEventArgs e)
         {
             Ball.Jump();
-        }
-
-        private void Window_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-            {
-                var angle = (e.GetPosition(this).Y - ActualHeight / 2) / ActualHeight * 180;
-                viewport.Camera.Transform = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), angle));
-            }
-        }
-
-        private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-
         }
     }
 }
