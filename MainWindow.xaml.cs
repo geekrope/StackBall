@@ -14,6 +14,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
+using System.Threading;
 
 namespace StackBall
 {
@@ -108,7 +109,21 @@ namespace StackBall
         {
             get; set;
         }
-        public const int TimeOffset = 5;
+        public const int TimeOffset = 3;
+        public int HittedCount
+        {
+            get; private set;
+        }
+        public int Power
+        {
+            get; private set;
+        }
+        public bool Invulnerable
+        {
+            get; private set;
+        }
+        public const int MaxPower = 40;
+        public const int PowerSpeed = 10;
 
         private MeshGeometry3D[] GetSphere(double radius, int count)
         {
@@ -236,6 +251,7 @@ namespace StackBall
         public void Jump()
         {
             State = BallState.Jumping;
+            HittedCount = 0;
         }
         public void Update()
         {
@@ -248,28 +264,47 @@ namespace StackBall
             else if (State == BallState.Hitting)
             {
                 SetTransform();
-                if (Tick == TimeOffset)
+                if (Tick % TimeOffset == 0)
                 {
-                    if (CanHit())
+                    if (CanHit() || Invulnerable)
                     {
                         OnHit?.Invoke();
+                        if (Power < MaxPower && !Invulnerable)
+                        {
+                            Power++;
+                        }
+                        else
+                        {
+                            Invulnerable = true;
+                        }
+                        HittedCount++;
                     }
-                    else
+                    else if (!Invulnerable)
                     {
                         OnDie?.Invoke();
+                        HittedCount = 0;
                     }
-                    Tick = 0;
-                }
-                else
-                {
-                    Tick++;
                 }
             }
+
+            if (Tick % PowerSpeed == 0 && Power != 0 && (State != BallState.Hitting || Invulnerable))
+            {
+                Power--;
+                if (Power == 0)
+                {
+                    Invulnerable = false;
+                }
+            }
+
+            Tick++;
         }
     }
 
     public class Block
     {
+        private int ScaleFrame;
+        private const int ScaleFrames = 20;
+        private const double ScaleDelta = 0.1;
         private bool Disposing;
         private double DisposeRadius = 0;
         private const double DisposeRadiusDelta = 0.5;
@@ -412,7 +447,7 @@ namespace StackBall
             {
                 foreach (var obj in model)
                 {
-                    obj.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -Angle)), new TranslateTransform3D(0, OffsetY, 0) }) };
+                    obj.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { GetRotationMatrix(), new TranslateTransform3D(0, OffsetY, 0), GetScaleMatrix() }) };
                 }
             }
         }
@@ -420,8 +455,21 @@ namespace StackBall
         {
             foreach (var element in collection)
             {
-                element.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -Angle)), new TranslateTransform3D(offset.X, offset.Y + OffsetY + 0.5, offset.Z) }) };
+                element.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { GetRotationMatrix(), new TranslateTransform3D(offset.X, offset.Y + OffsetY + 0.5, offset.Z) }) };
             }
+        }
+        private RotateTransform3D GetRotationMatrix()
+        {
+            return new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -Angle));
+        }
+        private ScaleTransform3D GetScaleMatrix()
+        {
+            var scale = 1.0;
+            if (Scaling)
+            {
+                scale = (1 + ScaleDelta) - Math.Abs((double)ScaleFrame / ScaleFrames * 2 - 1) * ScaleDelta;
+            }
+            return new ScaleTransform3D(scale, scale, scale);
         }
 
         public static readonly SolidColorBrush HealthZoneColor = Brushes.LawnGreen;
@@ -430,6 +478,10 @@ namespace StackBall
         /// Height, radius, width, count
         /// </summary>
         public static readonly (double, double, double, int) BlockSettings = (0.2, 2, 0.5, 100);
+        public bool Scaling
+        {
+            get; private set;
+        }
         public Action<Block> Disposed
         {
             get; set;
@@ -490,6 +542,18 @@ namespace StackBall
         }
         public void Update()
         {
+            if (Scaling)
+            {
+                if (ScaleFrame == ScaleFrames)
+                {
+                    Scaling = false;
+                    ScaleFrame = 0;
+                }
+                else
+                {
+                    ScaleFrame++;
+                }
+            }
             if (!Disposing)
             {
                 Rotate(DeadZonesGeometry, Angle);
@@ -524,11 +588,15 @@ namespace StackBall
         }
         public void IncreaseAngle(double delta = AngleDelta)
         {
-            if(!Disposing)
+            if (!Disposing)
             {
                 Angle += delta;
                 Angle = Angle % 360;
-            }            
+            }
+        }
+        public void Scale()
+        {
+            Scaling = true;
         }
 
         public Block(double offset)
@@ -546,8 +614,9 @@ namespace StackBall
         List<Block> Blocks;
         List<Block> VisualizedBlocks;
         List<Block> BlocksToRemove;
-        PlayerBall Ball;
+        PlayerBall Player;
         Block CurrentBlock;
+        bool Hitting = false;
 
         private void CreateBlocks(int count)
         {
@@ -589,10 +658,12 @@ namespace StackBall
         {
             CurrentBlock.Dispose();
             CurrentBlock.Update();
+
             if (CurrentBlockIndex + 1 < Blocks.Count)
             {
                 CurrentBlockIndex++;
                 CurrentBlock = Blocks[CurrentBlockIndex];
+
                 foreach (var block in Blocks)
                 {
                     block.OffsetY += BlockSpot;
@@ -604,7 +675,8 @@ namespace StackBall
                     viewport.Children.Add(Blocks[CurrentBlockIndex + BlocksBunch - 1].GetZones());
                 }
             }
-            Ball.CurrentBlock = CurrentBlock;
+
+            Player.CurrentBlock = CurrentBlock;
         }
 
         private void RemoveBlock(Block block)
@@ -615,6 +687,88 @@ namespace StackBall
         private void OnDie()
         {
             Timer.Stop();
+        }
+
+        private void SetBallState()
+        {
+            if (Hitting)
+            {
+                Player.Hit();
+            }
+            else
+            {
+                Player.Jump();
+            }
+        }
+
+        private void AnimateBlocks()
+        {
+            if (Player.State != BallState.Hitting)
+            {
+                foreach (var block in Blocks)
+                {
+                    block.IncreaseAngle();
+                }
+            }
+            else
+            {
+                foreach (var block in Blocks)
+                {
+                    block.IncreaseAngle(0.2);
+                }
+            }
+
+            foreach (var block in VisualizedBlocks)
+            {
+                block.Update();
+            }
+        }
+
+        private void RemoveBlocks()
+        {
+            for (; BlocksToRemove.Count != 0;)
+            {
+                var block = BlocksToRemove[0];
+                VisualizedBlocks.Remove(block);
+                BlocksToRemove.Remove(block);
+                viewport.Children.Remove(block.GetZones());
+            }
+        }
+
+        private void AnimatePower()
+        {
+            var arcLength = (double)Player.Power / PlayerBall.MaxPower * Math.PI * 2;
+            var radius = 50;
+            var point1 = new Point(radius * 2, radius);
+            var point2 = new Point(radius, radius);
+            var point3 = new Point(Math.Cos(arcLength) * radius + radius, -Math.Sin(arcLength) * radius + radius);
+            PolyLineSegment clipPolygon = new PolyLineSegment();
+
+            switch (arcLength)
+            {
+                case < Math.PI / 2:
+                    clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(radius * 2, 0) });
+                    break;
+                case < Math.PI:
+                    clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(0, 0), new Point(radius * 2, 0) });
+                    break;
+                case < Math.PI * 3 / 2:
+                    clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(0, radius * 2), new Point(0, 0), new Point(radius * 2, 0) });
+                    break;
+                default:
+                    clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(radius * 2, radius * 2), new Point(0, radius * 2), new Point(0, 0), new Point(radius * 2, 0) });
+                    break;
+            }
+            if (Player.Invulnerable)
+            {
+                power.Stroke = Brushes.Red;
+            }
+            else
+            {
+                power.Stroke = Brushes.White;
+            }
+
+            power.Clip = new PathGeometry() { Figures = new PathFigureCollection(new PathFigure[] { new PathFigure(point1, new PathSegment[] { clipPolygon }, false) }) };
         }
 
         public MainWindow()
@@ -638,11 +792,11 @@ namespace StackBall
                 viewport.Children.Add(Blocks[index].GetZones());
             }
 
-            Ball = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + Block.BlockSettings.Item1, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
-            viewport.Children.Add(new ModelVisual3D() { Content = new Model3DGroup() { Children = Ball.Ball } });
+            Player = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + Block.BlockSettings.Item1, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
+            viewport.Children.Add(new ModelVisual3D() { Content = new Model3DGroup() { Children = Player.Ball } });
 
-            Ball.OnHit = HitBlock;
-            Ball.OnDie = OnDie;
+            Player.OnHit = HitBlock;
+            Player.OnDie = OnDie;
 
             viewport.Camera.SetValue(ProjectionCamera.FarPlaneDistanceProperty, ZDepth * 2);
             viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(0, 0, ZDepth));
@@ -650,46 +804,31 @@ namespace StackBall
 
         private void OnTick(object sender, EventArgs e)
         {
-            if (Ball.State != BallState.Hitting)
-            {
-                foreach (var block in Blocks)
-                {
-                    block.IncreaseAngle();
-                }
-            }
-            else
-            {
-                foreach (var block in Blocks)
-                {
-                    block.IncreaseAngle(0.2);
-                }
-            }
+            SetBallState();
 
-            foreach (var block in VisualizedBlocks)
-            {
-                block.Update();
-            }
+            AnimateBlocks();
 
-            for (; BlocksToRemove.Count != 0;)
-            {
-                var block = BlocksToRemove[0];
-                VisualizedBlocks.Remove(block);
-                BlocksToRemove.Remove(block);
-                viewport.Children.Remove(block.GetZones());
-            }
-            Ball.Update();
+            RemoveBlocks();
 
-            debug.Content = Ball.CanHit();
+            Player.Update();
+
+            AnimatePower();
+
+            debug.Content = Player.CanHit();
         }
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            Ball.Hit();
+            Hitting = true;
         }
 
         private void Window_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            Ball.Jump();
+            Hitting = false;
+            if (Player.HittedCount != 0)
+            {
+                CurrentBlock.Scale();
+            }
         }
     }
 }
