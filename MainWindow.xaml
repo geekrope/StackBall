@@ -48,7 +48,7 @@
             </Viewport3D.Children>
         </Viewport3D>
         <Viewbox Width="200" Height="200" VerticalAlignment="Bottom" Margin="0 0 0 50">
-            <Canvas Width="100" Height="100">
+            <Canvas Width="100" Height="100" Name="powerBar"> 
                 <Ellipse Width="100" Height="100" StrokeThickness="10" Stroke="#4C000000"/>
                 <Ellipse Width="94" Name="power" Height="94" Canvas.Left="3" Canvas.Top="3" StrokeThickness="4" Stroke="Red"/>
             </Canvas>

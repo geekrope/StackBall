@@ -615,7 +615,17 @@ namespace StackBall
         List<Block> VisualizedBlocks;
         List<Block> BlocksToRemove;
         PlayerBall Player;
-        Block CurrentBlock;
+        Block CurrentBlock
+        {
+            get
+            {
+                return Blocks[CurrentBlockIndex];
+            }
+            set
+            {
+
+            }
+        }
         bool Hitting = false;
 
         private void CreateBlocks(int count)
@@ -662,7 +672,6 @@ namespace StackBall
             if (CurrentBlockIndex + 1 < Blocks.Count)
             {
                 CurrentBlockIndex++;
-                CurrentBlock = Blocks[CurrentBlockIndex];
 
                 foreach (var block in Blocks)
                 {
@@ -737,38 +746,46 @@ namespace StackBall
 
         private void AnimatePower()
         {
-            var arcLength = (double)Player.Power / PlayerBall.MaxPower * Math.PI * 2;
-            var radius = 50;
-            var point1 = new Point(radius * 2, radius);
-            var point2 = new Point(radius, radius);
-            var point3 = new Point(Math.Cos(arcLength) * radius + radius, -Math.Sin(arcLength) * radius + radius);
-            PolyLineSegment clipPolygon = new PolyLineSegment();
-
-            switch (arcLength)
+            if (Player.Power == 0)
             {
-                case < Math.PI / 2:
-                    clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(radius * 2, 0) });
-                    break;
-                case < Math.PI:
-                    clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(0, 0), new Point(radius * 2, 0) });
-                    break;
-                case < Math.PI * 3 / 2:
-                    clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(0, radius * 2), new Point(0, 0), new Point(radius * 2, 0) });
-                    break;
-                default:
-                    clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(radius * 2, radius * 2), new Point(0, radius * 2), new Point(0, 0), new Point(radius * 2, 0) });
-                    break;
-            }
-            if (Player.Invulnerable)
-            {
-                power.Stroke = Brushes.Red;
+                powerBar.Visibility = Visibility.Hidden;
             }
             else
             {
-                power.Stroke = Brushes.White;
-            }
+                powerBar.Visibility = Visibility.Visible;
+                var arcLength = (double)Player.Power / PlayerBall.MaxPower * Math.PI * 2;
+                var radius = power.Width / 2;
+                var point1 = new Point(radius * 2, radius);
+                var point2 = new Point(radius, radius);
+                var point3 = new Point(Math.Cos(arcLength) * radius + radius, -Math.Sin(arcLength) * radius + radius);
+                PolyLineSegment clipPolygon = new PolyLineSegment();
 
-            power.Clip = new PathGeometry() { Figures = new PathFigureCollection(new PathFigure[] { new PathFigure(point1, new PathSegment[] { clipPolygon }, false) }) };
+                switch (arcLength)
+                {
+                    case < Math.PI / 2:
+                        clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(radius * 2, 0) });
+                        break;
+                    case < Math.PI:
+                        clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(0, 0), new Point(radius * 2, 0) });
+                        break;
+                    case < Math.PI * 3 / 2:
+                        clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(0, radius * 2), new Point(0, 0), new Point(radius * 2, 0) });
+                        break;
+                    default:
+                        clipPolygon.Points = new PointCollection(new Point[] { point2, point3, new Point(radius * 2, radius * 2), new Point(0, radius * 2), new Point(0, 0), new Point(radius * 2, 0) });
+                        break;
+                }
+                if (Player.Invulnerable)
+                {
+                    power.Stroke = Brushes.Red;
+                }
+                else
+                {
+                    power.Stroke = Brushes.White;
+                }
+
+                power.Clip = new PathGeometry() { Figures = new PathFigureCollection(new PathFigure[] { new PathFigure(point1, new PathSegment[] { clipPolygon }, false) }) };
+            }
         }
 
         public MainWindow()
@@ -782,8 +799,8 @@ namespace StackBall
 
             BlocksToRemove = new List<Block>();
 
-            CreateBlocks(4000);
-            CurrentBlock = Blocks[0];
+            CreateBlocks(200);
+            CurrentBlockIndex = 0;
 
             VisualizedBlocks = new List<Block>();
             for (int index = 0; index < BlocksBunch; index++)
