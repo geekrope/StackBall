@@ -54,5 +54,6 @@
             </Canvas>
         </Viewbox>
         <Label Name="debug" Content="Label" HorizontalAlignment="Left" Margin="22,30,0,0" VerticalAlignment="Top"/>
+        <Button Name="restart" Content="Restart" HorizontalAlignment="Left" Margin="100,10,0,0" VerticalAlignment="Top" Click="restart_Click"/>
     </Grid>
 </Window>

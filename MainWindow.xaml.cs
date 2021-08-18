@@ -89,7 +89,7 @@ namespace StackBall
         {
             get; set;
         }
-        public Model3DCollection Ball
+        public ModelVisual3D Ball
         {
             get; private set;
         }
@@ -194,15 +194,13 @@ namespace StackBall
                 scale = 1;
             }
 
-            foreach (var obj in Ball)
+
+            Ball.Transform = new Transform3DGroup()
             {
-                obj.Transform = new Transform3DGroup()
-                {
-                    Children = new Transform3DCollection(new Transform3D[] { new TranslateTransform3D(OriginalPosition.X, jumpOffset + OriginalPosition.Y + OffsetY, OriginalPosition.Z),
+                Children = new Transform3DCollection(new Transform3D[] { new TranslateTransform3D(OriginalPosition.X, jumpOffset + OriginalPosition.Y + OffsetY, OriginalPosition.Z),
                         new ScaleTransform3D(1, scale, 1)
                     })
-                };
-            }
+            };
         }
         private bool AngleInArc(double startAngle, double sweepAngle, double angle)
         {
@@ -239,7 +237,7 @@ namespace StackBall
         }
         public PlayerBall(Point3D position, Block currentBlock)
         {
-            Ball = GetSphere(BallSettings.Item1, BallSettings.Item2).Merge(new DiffuseMaterial(Brushes.DodgerBlue));
+            Ball = new ModelVisual3D() { Content = new Model3DGroup() { Children = GetSphere(BallSettings.Item1, BallSettings.Item2).Merge(new DiffuseMaterial(Brushes.DodgerBlue)) } };
             State = BallState.Jumping;
             OriginalPosition = position;
             CurrentBlock = currentBlock;
@@ -609,7 +607,7 @@ namespace StackBall
         public const double ZDepth = 10;
         const double BlockSpot = 0.3;
         const int BlocksBunch = 8;
-        int CurrentBlockIndex = 0;
+        int CurrentBlockIndex;
         DispatcherTimer Timer;
         List<Block> Blocks;
         List<Block> VisualizedBlocks;
@@ -681,7 +679,7 @@ namespace StackBall
                 {
                     var newBlock = Blocks[CurrentBlockIndex + BlocksBunch - 1];
 
-                    VisualizedBlocks.Add(newBlock);                    
+                    VisualizedBlocks.Add(newBlock);
                     viewport.Children.Add(newBlock.GetZones());
 
                     AnimateBlocks();
@@ -699,6 +697,7 @@ namespace StackBall
         private void OnDie()
         {
             Timer.Stop();
+            restart.Visibility = Visibility.Visible;
         }
 
         private void SetBallState()
@@ -791,9 +790,9 @@ namespace StackBall
             }
         }
 
-        public MainWindow()
+        private void StartLevel()
         {
-            InitializeComponent();
+            restart.Visibility = Visibility.Hidden;
 
             Timer = new DispatcherTimer(DispatcherPriority.Send);
             Timer.Interval = TimeSpan.FromSeconds(0.001);
@@ -813,13 +812,20 @@ namespace StackBall
             }
 
             Player = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + Block.BlockSettings.Item1, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
-            viewport.Children.Add(new ModelVisual3D() { Content = new Model3DGroup() { Children = Player.Ball } });
+            viewport.Children.Add(Player.Ball);
 
             Player.OnHit = HitBlock;
             Player.OnDie = OnDie;
 
             viewport.Camera.SetValue(ProjectionCamera.FarPlaneDistanceProperty, ZDepth * 2);
             viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(0, 0, ZDepth));
+        }
+
+        public MainWindow()
+        {
+            InitializeComponent();
+
+            StartLevel();
         }
 
         private void OnTick(object sender, EventArgs e)
@@ -849,6 +855,18 @@ namespace StackBall
             {
                 CurrentBlock.Scale();
             }
+        }
+
+        private void restart_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var block in Blocks)
+            {
+                viewport.Children.Remove(block.GetZones());
+            }
+
+            viewport.Children.Remove(Player.Ball);
+
+            StartLevel();
         }
     }
 }
