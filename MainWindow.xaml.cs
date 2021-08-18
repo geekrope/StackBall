@@ -667,7 +667,6 @@ namespace StackBall
         private void HitBlock()
         {
             CurrentBlock.Dispose();
-            CurrentBlock.Update();
 
             if (CurrentBlockIndex + 1 < Blocks.Count)
             {
@@ -680,8 +679,12 @@ namespace StackBall
 
                 if (CurrentBlockIndex + BlocksBunch < Blocks.Count)
                 {
-                    VisualizedBlocks.Add(Blocks[CurrentBlockIndex + BlocksBunch - 1]);
-                    viewport.Children.Add(Blocks[CurrentBlockIndex + BlocksBunch - 1].GetZones());
+                    var newBlock = Blocks[CurrentBlockIndex + BlocksBunch - 1];
+
+                    VisualizedBlocks.Add(newBlock);                    
+                    viewport.Children.Add(newBlock.GetZones());
+
+                    AnimateBlocks();
                 }
             }
 
@@ -714,16 +717,16 @@ namespace StackBall
         {
             if (Player.State != BallState.Hitting)
             {
-                foreach (var block in Blocks)
+                for (int index = CurrentBlockIndex; index < Blocks.Count; index++)
                 {
-                    block.IncreaseAngle();
+                    Blocks[index].IncreaseAngle();
                 }
             }
             else
             {
-                foreach (var block in Blocks)
+                for (int index = CurrentBlockIndex; index < Blocks.Count; index++)
                 {
-                    block.IncreaseAngle(0.2);
+                    Blocks[index].IncreaseAngle(0.2);
                 }
             }
 
