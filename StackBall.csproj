@@ -7,11 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Resources\spot.png" />
+    <None Remove="Resources\bomb.png" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Resources\spot.png">
+    <Content Include="Resources\bomb.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

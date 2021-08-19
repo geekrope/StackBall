@@ -133,6 +133,7 @@ namespace StackBall
             {
                 var vertices = new List<Point3D>();
                 var indices = new List<int>();
+                var textureCoords = new List<Point>();
 
                 Action<int> createVertices = (int sign) =>
                 {
@@ -149,6 +150,8 @@ namespace StackBall
                             var z = Math.Sin(angleX) * parallelRadius * sign;
 
                             vertices.Add(new Point3D(x, y, z));
+
+                            textureCoords.Add(new Point(1 - (double)indexX / count, 1 - (double)indexY / count));
                         }
                     }
                 };
@@ -167,7 +170,7 @@ namespace StackBall
 
                 Func<List<Point3D>, List<int>, MeshGeometry3D> create3DObject = (List<Point3D> vertices, List<int> indices) =>
                 {
-                    return new MeshGeometry3D() { Positions = new Point3DCollection(vertices), TriangleIndices = new Int32Collection(indices) };
+                    return new MeshGeometry3D() { Positions = new Point3DCollection(vertices), TriangleIndices = new Int32Collection(indices), TextureCoordinates = new PointCollection(textureCoords) };
                 };
 
                 createVertices(sign);
@@ -235,9 +238,9 @@ namespace StackBall
             }
             return canHit;
         }
-        public PlayerBall(Point3D position, Block currentBlock)
+        public PlayerBall(Point3D position, Block currentBlock, string imageUri)
         {
-            Ball = new ModelVisual3D() { Content = new Model3DGroup() { Children = GetSphere(BallSettings.Item1, BallSettings.Item2).Merge(new DiffuseMaterial(Brushes.DodgerBlue)) } };
+            Ball = new ModelVisual3D() { Content = new Model3DGroup() { Children = GetSphere(BallSettings.Item1, BallSettings.Item2).Merge(new DiffuseMaterial(new ImageBrush(new BitmapImage(new Uri(imageUri, UriKind.RelativeOrAbsolute))))) } };
             State = BallState.Jumping;
             OriginalPosition = position;
             CurrentBlock = currentBlock;
@@ -368,77 +371,7 @@ namespace StackBall
         /// <param name="sweepAngle">Sweep angle in radians</param>
         /// <param name="count">Arc points count</param>
         /// <param name="width">Radius inset</param>
-        /// <returns>4 Sides of arc</returns>
-        private MeshGeometry3D[] GetArc(double height, double radius, double startAngle, double sweepAngle, double width, int count)
-        {
-            var parts = new MeshGeometry3D[4];
-
-            var verticesTop = new Point3D[count];
-            var indicesTop = new List<int>();
-
-            var verticesBottom = new Point3D[count];
-            var indicesBottom = new List<int>();
-
-            var verticesBack = new Point3D[count * 2];
-            var indicesBack = new List<int>();
-
-            var verticesFront = new Point3D[count * 2];
-            var indicesFront = new List<int>();
-
-            Action createVertices = () =>
-            {
-                for (int index = 0; index < count; index += 2)
-                {
-                    var angle = startAngle + sweepAngle * index / (count - 2); //counts - 2 equals to max index value
-                    var x = Math.Cos(angle) * radius;
-                    var z = Math.Sin(angle) * radius;
-                    var x2 = Math.Cos(angle) * (radius - width);
-                    var z2 = Math.Sin(angle) * (radius - width);
-
-                    verticesTop[index] = new Point3D(x, height / 2, z);
-                    verticesTop[index + 1] = new Point3D(x2, height / 2, z2);
-
-                    verticesBottom[index] = new Point3D(x, -height / 2, z);
-                    verticesBottom[index + 1] = new Point3D(x2, -height / 2, z2);
-
-                    verticesFront[index] = new Point3D(x, -height / 2, z);
-                    verticesFront[index + 1] = new Point3D(x, height / 2, z);
-
-                    verticesBack[index] = new Point3D(x2, -height / 2, z2);
-                    verticesBack[index + 1] = new Point3D(x2, height / 2, z2);
-                }
-            };
-
-            Action getIndices = () =>
-            {
-                for (int index = 0; index < count - 3; index += 2)
-                {
-                    var index1 = index;
-                    var index2 = index + 1;
-                    var index3 = index + 2;
-                    var index4 = index + 3;
-                    indicesTop.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
-                    indicesBottom.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
-                    indicesFront.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
-                    indicesBack.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
-                }
-            };
-
-            Func<Point3D[], List<int>, MeshGeometry3D> create3DObject = (Point3D[] vertices, List<int> indices) =>
-            {
-                return new MeshGeometry3D() { Positions = new Point3DCollection(vertices), TriangleIndices = new Int32Collection(indices) };
-            };
-
-            createVertices();
-            getIndices();
-
-            parts[0] = create3DObject(verticesTop, indicesTop);
-            parts[1] = create3DObject(verticesBottom, indicesBottom);
-            parts[2] = create3DObject(verticesFront, indicesFront);
-            parts[3] = create3DObject(verticesBack, indicesBack);
-
-            return parts;
-        }
+        /// <returns>4 Sides of arc</returns>       
         private void Rotate(List<Model3DCollection> models3D, double angle)
         {
             foreach (var model in models3D)
@@ -595,6 +528,76 @@ namespace StackBall
         public void Scale()
         {
             Scaling = true;
+        }
+        public static MeshGeometry3D[] GetArc(double height, double radius, double startAngle, double sweepAngle, double width, int count)
+        {
+            var parts = new MeshGeometry3D[4];
+
+            var verticesTop = new Point3D[count];
+            var indicesTop = new List<int>();
+
+            var verticesBottom = new Point3D[count];
+            var indicesBottom = new List<int>();
+
+            var verticesBack = new Point3D[count * 2];
+            var indicesBack = new List<int>();
+
+            var verticesFront = new Point3D[count * 2];
+            var indicesFront = new List<int>();
+
+            Action createVertices = () =>
+            {
+                for (int index = 0; index < count; index += 2)
+                {
+                    var angle = startAngle + sweepAngle * index / (count - 2); //counts - 2 equals to max index value
+                    var x = Math.Cos(angle) * radius;
+                    var z = Math.Sin(angle) * radius;
+                    var x2 = Math.Cos(angle) * (radius - width);
+                    var z2 = Math.Sin(angle) * (radius - width);
+
+                    verticesTop[index] = new Point3D(x, height / 2, z);
+                    verticesTop[index + 1] = new Point3D(x2, height / 2, z2);
+
+                    verticesBottom[index] = new Point3D(x, -height / 2, z);
+                    verticesBottom[index + 1] = new Point3D(x2, -height / 2, z2);
+
+                    verticesFront[index] = new Point3D(x, -height / 2, z);
+                    verticesFront[index + 1] = new Point3D(x, height / 2, z);
+
+                    verticesBack[index] = new Point3D(x2, -height / 2, z2);
+                    verticesBack[index + 1] = new Point3D(x2, height / 2, z2);
+                }
+            };
+
+            Action getIndices = () =>
+            {
+                for (int index = 0; index < count - 3; index += 2)
+                {
+                    var index1 = index;
+                    var index2 = index + 1;
+                    var index3 = index + 2;
+                    var index4 = index + 3;
+                    indicesTop.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+                    indicesBottom.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+                    indicesFront.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+                    indicesBack.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+                }
+            };
+
+            Func<Point3D[], List<int>, MeshGeometry3D> create3DObject = (Point3D[] vertices, List<int> indices) =>
+            {
+                return new MeshGeometry3D() { Positions = new Point3DCollection(vertices), TriangleIndices = new Int32Collection(indices) };
+            };
+
+            createVertices();
+            getIndices();
+
+            parts[0] = create3DObject(verticesTop, indicesTop);
+            parts[1] = create3DObject(verticesBottom, indicesBottom);
+            parts[2] = create3DObject(verticesFront, indicesFront);
+            parts[3] = create3DObject(verticesBack, indicesBack);
+
+            return parts;
         }
 
         public Block(double offset)
@@ -811,7 +814,7 @@ namespace StackBall
                 viewport.Children.Add(Blocks[index].GetZones());
             }
 
-            Player = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + Block.BlockSettings.Item1, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock);
+            Player = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + Block.BlockSettings.Item1, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock, "Resources/watermelon.png");
             viewport.Children.Add(Player.Ball);
 
             Player.OnHit = HitBlock;
