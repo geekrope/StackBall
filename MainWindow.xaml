@@ -47,7 +47,7 @@
                     </ModelVisual3D>
                     <ModelVisual3D>
                         <ModelVisual3D.Content>
-                            <AmbientLight Color="#b0b0b0">
+                            <AmbientLight Color="#808080">
                             </AmbientLight>
                         </ModelVisual3D.Content>
                     </ModelVisual3D>
@@ -59,8 +59,8 @@
                     <Ellipse Width="94" Name="power" Height="94" Canvas.Left="3" Canvas.Top="3" StrokeThickness="4" Stroke="Red"/>
                 </Canvas>
             </Viewbox>
-            <Label Style="{StaticResource kwajong}" Name="debug" Content="Label" Margin="10,10,0,0"/>
-            <Label Style="{StaticResource kwajong}" Name="level" Content="Lab2el" HorizontalAlignment="Center"/>
+            <Label Style="{StaticResource kwajong}" Name="debug" Content="" Margin="10,10,0,0"/>
+            <Label Style="{StaticResource kwajong}" Name="level" Content="" HorizontalAlignment="Center" FontSize="48"/>
         </Grid>       
         <Viewbox>
             <Label Style="{StaticResource kwajong}" Name="endMessage" Content="Restart" MouseDown="End"/>

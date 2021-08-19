@@ -300,6 +300,10 @@ namespace StackBall
 
             Tick++;
         }
+        public void ResetPower()
+        {
+            Power = 0;
+        }
     }
 
     public class Block
@@ -403,6 +407,76 @@ namespace StackBall
                 scale = (1 + ScaleDelta) - Math.Abs((double)ScaleFrame / ScaleFrames * 2 - 1) * ScaleDelta;
             }
             return new ScaleTransform3D(scale, scale, scale);
+        }
+        private MeshGeometry3D[] GetArc(double height, double radius, double startAngle, double sweepAngle, double width, int count)
+        {
+            var parts = new MeshGeometry3D[4];
+
+            var verticesTop = new Point3D[count];
+            var indicesTop = new List<int>();
+
+            var verticesBottom = new Point3D[count];
+            var indicesBottom = new List<int>();
+
+            var verticesBack = new Point3D[count * 2];
+            var indicesBack = new List<int>();
+
+            var verticesFront = new Point3D[count * 2];
+            var indicesFront = new List<int>();
+
+            Action createVertices = () =>
+            {
+                for (int index = 0; index < count; index += 2)
+                {
+                    var angle = startAngle + sweepAngle * index / (count - 2); //counts - 2 equals to max index value
+                    var x = Math.Cos(angle) * radius;
+                    var z = Math.Sin(angle) * radius;
+                    var x2 = Math.Cos(angle) * (radius - width);
+                    var z2 = Math.Sin(angle) * (radius - width);
+
+                    verticesTop[index] = new Point3D(x, height / 2, z);
+                    verticesTop[index + 1] = new Point3D(x2, height / 2, z2);
+
+                    verticesBottom[index] = new Point3D(x, -height / 2, z);
+                    verticesBottom[index + 1] = new Point3D(x2, -height / 2, z2);
+
+                    verticesFront[index] = new Point3D(x, -height / 2, z);
+                    verticesFront[index + 1] = new Point3D(x, height / 2, z);
+
+                    verticesBack[index] = new Point3D(x2, -height / 2, z2);
+                    verticesBack[index + 1] = new Point3D(x2, height / 2, z2);
+                }
+            };
+
+            Action getIndices = () =>
+            {
+                for (int index = 0; index < count - 3; index += 2)
+                {
+                    var index1 = index;
+                    var index2 = index + 1;
+                    var index3 = index + 2;
+                    var index4 = index + 3;
+                    indicesTop.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+                    indicesBottom.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+                    indicesFront.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+                    indicesBack.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+                }
+            };
+
+            Func<Point3D[], List<int>, MeshGeometry3D> create3DObject = (Point3D[] vertices, List<int> indices) =>
+            {
+                return new MeshGeometry3D() { Positions = new Point3DCollection(vertices), TriangleIndices = new Int32Collection(indices) };
+            };
+
+            createVertices();
+            getIndices();
+
+            parts[0] = create3DObject(verticesTop, indicesTop);
+            parts[1] = create3DObject(verticesBottom, indicesBottom);
+            parts[2] = create3DObject(verticesFront, indicesFront);
+            parts[3] = create3DObject(verticesBack, indicesBack);
+
+            return parts;
         }
 
         public static readonly SolidColorBrush HealthZoneColor = Brushes.LawnGreen;
@@ -531,84 +605,21 @@ namespace StackBall
         {
             Scaling = true;
         }
-        public static MeshGeometry3D[] GetArc(double height, double radius, double startAngle, double sweepAngle, double width, int count)
-        {
-            var parts = new MeshGeometry3D[4];
 
-            var verticesTop = new Point3D[count];
-            var indicesTop = new List<int>();
-
-            var verticesBottom = new Point3D[count];
-            var indicesBottom = new List<int>();
-
-            var verticesBack = new Point3D[count * 2];
-            var indicesBack = new List<int>();
-
-            var verticesFront = new Point3D[count * 2];
-            var indicesFront = new List<int>();
-
-            Action createVertices = () =>
-            {
-                for (int index = 0; index < count; index += 2)
-                {
-                    var angle = startAngle + sweepAngle * index / (count - 2); //counts - 2 equals to max index value
-                    var x = Math.Cos(angle) * radius;
-                    var z = Math.Sin(angle) * radius;
-                    var x2 = Math.Cos(angle) * (radius - width);
-                    var z2 = Math.Sin(angle) * (radius - width);
-
-                    verticesTop[index] = new Point3D(x, height / 2, z);
-                    verticesTop[index + 1] = new Point3D(x2, height / 2, z2);
-
-                    verticesBottom[index] = new Point3D(x, -height / 2, z);
-                    verticesBottom[index + 1] = new Point3D(x2, -height / 2, z2);
-
-                    verticesFront[index] = new Point3D(x, -height / 2, z);
-                    verticesFront[index + 1] = new Point3D(x, height / 2, z);
-
-                    verticesBack[index] = new Point3D(x2, -height / 2, z2);
-                    verticesBack[index + 1] = new Point3D(x2, height / 2, z2);
-                }
-            };
-
-            Action getIndices = () =>
-            {
-                for (int index = 0; index < count - 3; index += 2)
-                {
-                    var index1 = index;
-                    var index2 = index + 1;
-                    var index3 = index + 2;
-                    var index4 = index + 3;
-                    indicesTop.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
-                    indicesBottom.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
-                    indicesFront.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
-                    indicesBack.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
-                }
-            };
-
-            Func<Point3D[], List<int>, MeshGeometry3D> create3DObject = (Point3D[] vertices, List<int> indices) =>
-            {
-                return new MeshGeometry3D() { Positions = new Point3DCollection(vertices), TriangleIndices = new Int32Collection(indices) };
-            };
-
-            createVertices();
-            getIndices();
-
-            parts[0] = create3DObject(verticesTop, indicesTop);
-            parts[1] = create3DObject(verticesBottom, indicesBottom);
-            parts[2] = create3DObject(verticesFront, indicesFront);
-            parts[3] = create3DObject(verticesBack, indicesBack);
-
-            return parts;
-        }
 
         public Block(double offset)
         {
             OffsetY = offset;
         }
     }
+
     public partial class MainWindow : Window
     {
+        public enum LevelCompleteness
+        {
+            Incompleted, Died, Completed
+        }
+
         public const double ZDepth = 10;
 
         const double BlockSpot = 0.3;
@@ -621,6 +632,8 @@ namespace StackBall
         List<Block> VisualizedBlocks;
         List<Block> BlocksToRemove;
         PlayerBall Player;
+        ModelVisual3D Tube;
+        ModelVisual3D TubeBottom;
         Block CurrentBlock
         {
             get
@@ -633,9 +646,40 @@ namespace StackBall
             }
         }
 
+        LevelCompleteness currentLevelCompleteness;
+        LevelCompleteness CurrentLevelCompleteness
+        {
+            get
+            {
+                return currentLevelCompleteness;
+            }
+            set
+            {
+                currentLevelCompleteness = value;
+                if (currentLevelCompleteness == LevelCompleteness.Completed || currentLevelCompleteness == LevelCompleteness.Died)
+                {
+                    ShowEndLabel();
+                }
+                switch (currentLevelCompleteness)
+                {
+                    case LevelCompleteness.Completed:
+                        var key = CreateOrOpenSubKey();
+                        key.SetValue(LevelKey, (int)key.GetValue(LevelKey) + 1);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
         bool Hitting;
-        bool Win;
         int CurrentBlockIndex;
+        int BlocksCount;
+
+        private TranslateTransform3D GetTubeTransform()
+        {
+            return new TranslateTransform3D(0, -BlockSpot * (BlocksCount - 1 - CurrentBlockIndex), 0);
+        }
 
         private void CreateBlocks(int count)
         {
@@ -685,6 +729,8 @@ namespace StackBall
                     block.OffsetY += BlockSpot;
                 }
 
+                TubeBottom.Transform = GetTubeTransform();
+
                 if (CurrentBlockIndex + BlocksBunch < Blocks.Count)
                 {
                     var newBlock = Blocks[CurrentBlockIndex + BlocksBunch - 1];
@@ -698,12 +744,7 @@ namespace StackBall
             }
             else
             {
-                Win = true;
-
-                Timer.Stop();
-                var key = CreateOrOpenSubKey();
-                key.SetValue(LevelKey, (int)key.GetValue(LevelKey) + 1);
-                ShowEndLabel();
+                CurrentLevelCompleteness = LevelCompleteness.Completed;
             }
         }
 
@@ -714,9 +755,7 @@ namespace StackBall
 
         private void OnDie()
         {
-            Timer.Stop();
-            ShowEndLabel();
-            Win = false;
+            CurrentLevelCompleteness = LevelCompleteness.Died;
         }
 
         private void SetBallState()
@@ -823,7 +862,8 @@ namespace StackBall
 
             var level = (int)CreateOrOpenSubKey().GetValue(LevelKey);
 
-            CreateBlocks(200 + level * 10);
+            BlocksCount = 10;
+            CreateBlocks(BlocksCount);
             CurrentBlockIndex = 0;
 
             VisualizedBlocks = new List<Block>();
@@ -857,30 +897,95 @@ namespace StackBall
         {
             endMessage.Visibility = Visibility.Hidden;
 
-            CreateTimer();
+            if (Timer == null)
+            {
+                CreateTimer();
+            }
             CreateBlocks();
             CreateBall();
 
             viewport.Camera.SetValue(ProjectionCamera.FarPlaneDistanceProperty, ZDepth * 2);
             viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(0, 0, ZDepth));
 
-            Win = false;
+            CurrentLevelCompleteness = LevelCompleteness.Incompleted;
             Hitting = false;
 
+            var tube = CreateTube();
+
+            Tube = tube.Item1;
+            TubeBottom = tube.Item2;
+
+            viewport.Children.Add(Tube);
+            viewport.Children.Add(TubeBottom);
+
+
             level.Content = CreateOrOpenSubKey().GetValue(LevelKey);
+
+            OnTick(new object(), new EventArgs());
         }
 
         private void ShowEndLabel()
         {
             endMessage.Visibility = Visibility.Visible;
-            if (Win)
+            if (CurrentLevelCompleteness == LevelCompleteness.Completed)
             {
                 endMessage.Content = "Continue";
             }
-            else
+            else if (CurrentLevelCompleteness == LevelCompleteness.Died)
             {
                 endMessage.Content = "Restart";
             }
+        }
+
+        private (ModelVisual3D, ModelVisual3D) CreateTube()
+        {
+            const int count = 200;
+            const double radius = 0.5;
+
+            var tubeVertices = new List<Point3D>();
+            var tubeIndices = new List<int>();
+            var tubeBottomVertices = new List<Point3D>() { new Point3D(0, 0, 0) };
+            var tubeBottomIndices = new List<int>();
+
+            for (int index = 0; index < count / 2; index += 1)
+            {
+                var angle = (double)index / (count / 2) * Math.PI * 2;
+                tubeVertices.Add(new Point3D(Math.Cos(angle) * radius, BlocksBunch * BlockSpot, Math.Sin(angle) * radius));
+                tubeVertices.Add(new Point3D(Math.Cos(angle) * radius, -BlocksBunch * BlockSpot, Math.Sin(angle) * radius));
+            }
+
+            for (int index = 0; index < count - 3; index += 2)
+            {
+                var index1 = index;
+                var index2 = index + 1;
+                var index3 = index + 2;
+                var index4 = index + 3;
+                tubeIndices.AddRange(new int[] { index3, index1, index2, index3, index2, index4 });
+            }
+
+            for (int index = 0; index < count; index++)
+            {
+                var angle = (double)index / count * Math.PI * 2;
+                tubeBottomVertices.Add(new Point3D(Math.Cos(angle) * Block.BlockSettings.Item2, 0, Math.Sin(angle) * Block.BlockSettings.Item2));
+            }
+            for (int index = 0; index < count - 1; index++)
+            {
+                var index1 = 0;
+                var index2 = index;
+                var index3 = index + 1;
+                tubeBottomIndices.AddRange(new int[] { index1, index2, index3 });
+            }
+            tubeBottomIndices.AddRange(new int[] { 0, count - 1, 1 });
+
+            var tube = new MeshGeometry3D() { Positions = new Point3DCollection(tubeVertices), TriangleIndices = new Int32Collection(tubeIndices) };
+            var tubeBottom = new MeshGeometry3D() { Positions = new Point3DCollection(tubeBottomVertices), TriangleIndices = new Int32Collection(tubeBottomIndices) };
+
+            var tubeModel = new ModelVisual3D() { Content = new Model3DGroup() { Children = new MeshGeometry3D[] { tube }.Merge(new DiffuseMaterial(Brushes.White)) } };
+            var tubeBottomModel = new ModelVisual3D() { Content = new Model3DGroup() { Children = new MeshGeometry3D[] { tubeBottom }.Merge(new DiffuseMaterial(Brushes.White)) } };
+
+            tubeBottomModel.Transform = GetTubeTransform();
+
+            return (tubeModel, tubeBottomModel);
         }
 
         private RegistryKey CreateOrOpenSubKey()
@@ -907,13 +1012,24 @@ namespace StackBall
 
         private void OnTick(object sender, EventArgs e)
         {
-            SetBallState();
+            if (CurrentLevelCompleteness != LevelCompleteness.Incompleted)
+            {
+                Player.Jump();
+                Player.ResetPower();
+            }
+            else
+            {
+                SetBallState();
+            }
+
+            if (CurrentLevelCompleteness != LevelCompleteness.Died)
+            {
+                Player.Update();
+            }
 
             AnimateBlocks();
 
             RemoveBlocks();
-
-            Player.Update();
 
             AnimatePower();
 
@@ -922,15 +1038,21 @@ namespace StackBall
 
         private void Press(object sender, MouseButtonEventArgs e)
         {
-            Hitting = true;
+            if (CurrentLevelCompleteness == LevelCompleteness.Incompleted)
+            {
+                Hitting = true;
+            }
         }
 
         private void Release(object sender, MouseButtonEventArgs e)
         {
-            Hitting = false;
-            if (Player.HittedCount != 0)
+            if (CurrentLevelCompleteness == LevelCompleteness.Incompleted)
             {
-                CurrentBlock.Scale();
+                Hitting = false;
+                if (Player.HittedCount != 0)
+                {
+                    CurrentBlock.Scale();
+                }
             }
         }
 
@@ -943,12 +1065,10 @@ namespace StackBall
 
             viewport.Children.Remove(Player.Ball);
 
+            viewport.Children.Remove(Tube);
+            viewport.Children.Remove(TubeBottom);
+
             StartLevel();
-
-            if (Win)
-            {
-
-            }
         }
     }
 }
