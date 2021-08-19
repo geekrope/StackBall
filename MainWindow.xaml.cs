@@ -15,6 +15,7 @@ using System.Windows.Shapes;
 using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using System.Threading;
+using Microsoft.Win32;
 
 namespace StackBall
 {
@@ -361,6 +362,7 @@ namespace StackBall
 
             var modelsCollection = new Model3DCollection(DeadZonesGeometry.ExpandCollection().Concat(HealthZonesGeometry.ExpandCollection()));
             Zones = new ModelVisual3D() { Content = new Model3DGroup() { Children = modelsCollection } };
+            Zones.SetValue(RenderOptions.EdgeModeProperty, EdgeMode.Aliased);
         }
         /// <summary>
         /// Gets point of the given arc
@@ -608,9 +610,12 @@ namespace StackBall
     public partial class MainWindow : Window
     {
         public const double ZDepth = 10;
+
         const double BlockSpot = 0.3;
         const int BlocksBunch = 8;
-        int CurrentBlockIndex;
+        const string RegisterKey = "stackball";
+        const string LevelKey = "level";
+
         DispatcherTimer Timer;
         List<Block> Blocks;
         List<Block> VisualizedBlocks;
@@ -627,7 +632,10 @@ namespace StackBall
 
             }
         }
-        bool Hitting = false;
+
+        bool Hitting;
+        bool Win;
+        int CurrentBlockIndex;
 
         private void CreateBlocks(int count)
         {
@@ -667,10 +675,9 @@ namespace StackBall
 
         private void HitBlock()
         {
-            CurrentBlock.Dispose();
-
             if (CurrentBlockIndex + 1 < Blocks.Count)
             {
+                CurrentBlock.Dispose();
                 CurrentBlockIndex++;
 
                 foreach (var block in Blocks)
@@ -687,9 +694,17 @@ namespace StackBall
 
                     AnimateBlocks();
                 }
+                Player.CurrentBlock = CurrentBlock;
             }
+            else
+            {
+                Win = true;
 
-            Player.CurrentBlock = CurrentBlock;
+                Timer.Stop();
+                var key = CreateOrOpenSubKey();
+                key.SetValue(LevelKey, (int)key.GetValue(LevelKey) + 1);
+                ShowEndLabel();
+            }
         }
 
         private void RemoveBlock(Block block)
@@ -700,7 +715,8 @@ namespace StackBall
         private void OnDie()
         {
             Timer.Stop();
-            restart.Visibility = Visibility.Visible;
+            ShowEndLabel();
+            Win = false;
         }
 
         private void SetBallState()
@@ -793,18 +809,21 @@ namespace StackBall
             }
         }
 
-        private void StartLevel()
+        private void CreateTimer()
         {
-            restart.Visibility = Visibility.Hidden;
-
             Timer = new DispatcherTimer(DispatcherPriority.Send);
             Timer.Interval = TimeSpan.FromSeconds(0.001);
             Timer.Tick += OnTick;
             Timer.Start();
+        }
 
+        private void CreateBlocks()
+        {
             BlocksToRemove = new List<Block>();
 
-            CreateBlocks(200);
+            var level = (int)CreateOrOpenSubKey().GetValue(LevelKey);
+
+            CreateBlocks(200 + level * 10);
             CurrentBlockIndex = 0;
 
             VisualizedBlocks = new List<Block>();
@@ -813,15 +832,70 @@ namespace StackBall
                 VisualizedBlocks.Add(Blocks[index]);
                 viewport.Children.Add(Blocks[index].GetZones());
             }
+        }
 
-            Player = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + Block.BlockSettings.Item1, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock, "Resources/watermelon.png");
+        private void CreateBall()
+        {
+            var texture = "";
+            switch ((int)CreateOrOpenSubKey().GetValue(LevelKey))
+            {
+                case < 10:
+                    texture = "Resources/soccer.png";
+                    break;
+                default:
+                    texture = "Resources/bomb.png";
+                    break;
+            }
+            Player = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + Block.BlockSettings.Item1, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock, texture);
             viewport.Children.Add(Player.Ball);
 
             Player.OnHit = HitBlock;
             Player.OnDie = OnDie;
+        }
+
+        private void StartLevel()
+        {
+            endMessage.Visibility = Visibility.Hidden;
+
+            CreateTimer();
+            CreateBlocks();
+            CreateBall();
 
             viewport.Camera.SetValue(ProjectionCamera.FarPlaneDistanceProperty, ZDepth * 2);
             viewport.Camera.SetValue(ProjectionCamera.PositionProperty, new Point3D(0, 0, ZDepth));
+
+            Win = false;
+            Hitting = false;
+
+            level.Content = CreateOrOpenSubKey().GetValue(LevelKey);
+        }
+
+        private void ShowEndLabel()
+        {
+            endMessage.Visibility = Visibility.Visible;
+            if (Win)
+            {
+                endMessage.Content = "Continue";
+            }
+            else
+            {
+                endMessage.Content = "Restart";
+            }
+        }
+
+        private RegistryKey CreateOrOpenSubKey()
+        {
+            var key = Registry.CurrentUser.OpenSubKey(RegisterKey, true);
+            if (key != null)
+            {
+                return key;
+            }
+            else
+            {
+                var newKey = Registry.CurrentUser.CreateSubKey(RegisterKey, true);
+                newKey.SetValue(LevelKey, 0);
+                return newKey;
+            }
         }
 
         public MainWindow()
@@ -846,12 +920,12 @@ namespace StackBall
             debug.Content = Player.CanHit();
         }
 
-        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
+        private void Press(object sender, MouseButtonEventArgs e)
         {
             Hitting = true;
         }
 
-        private void Window_MouseUp(object sender, MouseButtonEventArgs e)
+        private void Release(object sender, MouseButtonEventArgs e)
         {
             Hitting = false;
             if (Player.HittedCount != 0)
@@ -860,7 +934,7 @@ namespace StackBall
             }
         }
 
-        private void restart_Click(object sender, RoutedEventArgs e)
+        private void End(object sender, RoutedEventArgs e)
         {
             foreach (var block in Blocks)
             {
@@ -870,6 +944,11 @@ namespace StackBall
             viewport.Children.Remove(Player.Ball);
 
             StartLevel();
+
+            if (Win)
+            {
+
+            }
         }
     }
 }

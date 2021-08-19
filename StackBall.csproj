@@ -8,12 +8,18 @@
 
   <ItemGroup>
     <None Remove="Resources\bomb.png" />
+    <None Remove="Resources\Kwajong.ttf" />
+    <None Remove="Resources\soccer.png" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="Resources\bomb.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Resources\Kwajong.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\soccer.png" />
   </ItemGroup>
 
 </Project>
