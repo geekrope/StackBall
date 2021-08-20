@@ -16,6 +16,8 @@ using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using System.Threading;
 using Microsoft.Win32;
+using System.IO;
+using System.Windows.Markup;
 
 namespace StackBall
 {
@@ -42,13 +44,16 @@ namespace StackBall
         {
             return new Transform3DGroup() { Children = new Transform3DCollection() { origin, addition } };
         }
-        public static Model3DCollection Merge(this MeshGeometry3D[] geometryes3D, Material material)
+        public static Model3DCollection Merge(this MeshGeometry3D[] geometryes3D, Material material, bool enableBackMaterial = true)
         {
             var collection = new Model3DCollection();
             foreach (var geometry in geometryes3D)
             {
                 var model3D = new GeometryModel3D(geometry, material);
-                model3D.SetValue(GeometryModel3D.BackMaterialProperty, material);
+                if (enableBackMaterial)
+                {
+                    model3D.SetValue(GeometryModel3D.BackMaterialProperty, material);
+                }
                 collection.Add(model3D);
             }
             return collection;
@@ -85,7 +90,7 @@ namespace StackBall
         /// <summary>
         /// Radius count
         /// </summary>
-        public static readonly (double, int) BallSettings = (0.2, 20);
+        public static readonly (double, int) BallSettings = (0.2, 100);
         public BallState State
         {
             get; set;
@@ -241,7 +246,8 @@ namespace StackBall
         }
         public PlayerBall(Point3D position, Block currentBlock, string imageUri)
         {
-            Ball = new ModelVisual3D() { Content = new Model3DGroup() { Children = GetSphere(BallSettings.Item1, BallSettings.Item2).Merge(new DiffuseMaterial(new ImageBrush(new BitmapImage(new Uri(imageUri, UriKind.RelativeOrAbsolute))))) } };
+            var material = new DiffuseMaterial(new ImageBrush(new BitmapImage(new Uri(imageUri, UriKind.RelativeOrAbsolute))));            
+            Ball = new ModelVisual3D() { Content = new Model3DGroup() { Children = GetSphere(BallSettings.Item1, BallSettings.Item2).Merge(material, false) } };
             State = BallState.Jumping;
             OriginalPosition = position;
             CurrentBlock = currentBlock;
@@ -378,15 +384,9 @@ namespace StackBall
         /// <param name="count">Arc points count</param>
         /// <param name="width">Radius inset</param>
         /// <returns>4 Sides of arc</returns>       
-        private void Rotate(List<Model3DCollection> models3D, double angle)
+        private void Rotate(ModelVisual3D model3D)
         {
-            foreach (var model in models3D)
-            {
-                foreach (var obj in model)
-                {
-                    obj.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { GetRotationMatrix(), new TranslateTransform3D(0, OffsetY, 0), GetScaleMatrix() }) };
-                }
-            }
+            model3D.Transform = new Transform3DGroup() { Children = new Transform3DCollection(new Transform3D[] { GetRotationMatrix(), new TranslateTransform3D(0, OffsetY, 0), GetScaleMatrix() }) };
         }
         private void Translate(Model3DCollection collection, Vector3D offset)
         {
@@ -484,7 +484,7 @@ namespace StackBall
         /// <summary>
         /// Height, radius, width, count
         /// </summary>
-        public static readonly (double, double, double, int) BlockSettings = (0.2, 2, 0.5, 100);
+        public static readonly (double, double, double, int) BlockSettings = (0.2, 2, 0.5, 50);
         public bool Scaling
         {
             get; private set;
@@ -563,8 +563,7 @@ namespace StackBall
             }
             if (!Disposing)
             {
-                Rotate(DeadZonesGeometry, Angle);
-                Rotate(HealthZonesGeometry, Angle);
+                Rotate(Zones);
             }
             else
             {
@@ -606,7 +605,6 @@ namespace StackBall
             Scaling = true;
         }
 
-
         public Block(double offset)
         {
             OffsetY = offset;
@@ -629,7 +627,7 @@ namespace StackBall
 
         DispatcherTimer Timer;
         List<Block> Blocks;
-        List<Block> VisualizedBlocks;
+        LinkedList<Block> VisualizedBlocks;
         List<Block> BlocksToRemove;
         PlayerBall Player;
         ModelVisual3D Tube;
@@ -675,6 +673,9 @@ namespace StackBall
         bool Hitting;
         int CurrentBlockIndex;
         int BlocksCount;
+        int TickStart = Environment.TickCount;
+        int Fps = 0;
+        int VisualizedFps = 0;
 
         private TranslateTransform3D GetTubeTransform()
         {
@@ -735,7 +736,7 @@ namespace StackBall
                 {
                     var newBlock = Blocks[CurrentBlockIndex + BlocksBunch - 1];
 
-                    VisualizedBlocks.Add(newBlock);
+                    VisualizedBlocks.AddLast(newBlock);
                     viewport.Children.Add(newBlock.GetZones());
 
                     AnimateBlocks();
@@ -801,6 +802,7 @@ namespace StackBall
                 VisualizedBlocks.Remove(block);
                 BlocksToRemove.Remove(block);
                 viewport.Children.Remove(block.GetZones());
+                block = null;
             }
         }
 
@@ -850,7 +852,7 @@ namespace StackBall
 
         private void CreateTimer()
         {
-            Timer = new DispatcherTimer(DispatcherPriority.Send);
+            Timer = new DispatcherTimer(DispatcherPriority.Background);
             Timer.Interval = TimeSpan.FromSeconds(0.001);
             Timer.Tick += OnTick;
             Timer.Start();
@@ -860,32 +862,24 @@ namespace StackBall
         {
             BlocksToRemove = new List<Block>();
 
-            var level = (int)CreateOrOpenSubKey().GetValue(LevelKey);
-
-            BlocksCount = 10;
+            BlocksCount = 100;
             CreateBlocks(BlocksCount);
             CurrentBlockIndex = 0;
 
-            VisualizedBlocks = new List<Block>();
+            VisualizedBlocks = new LinkedList<Block>();
             for (int index = 0; index < BlocksBunch; index++)
             {
-                VisualizedBlocks.Add(Blocks[index]);
+                VisualizedBlocks.AddLast(Blocks[index]);
                 viewport.Children.Add(Blocks[index].GetZones());
             }
         }
 
         private void CreateBall()
         {
-            var texture = "";
-            switch ((int)CreateOrOpenSubKey().GetValue(LevelKey))
-            {
-                case < 10:
-                    texture = "Resources/soccer.png";
-                    break;
-                default:
-                    texture = "Resources/bomb.png";
-                    break;
-            }
+            var level = (int)CreateOrOpenSubKey().GetValue(LevelKey);
+
+            var texture = GetTexture(level);
+
             Player = new PlayerBall(new Point3D(0, PlayerBall.BallSettings.Item1 / 2 + Block.BlockSettings.Item1, Block.BlockSettings.Item2 - Block.BlockSettings.Item3 / 2), CurrentBlock, texture);
             viewport.Children.Add(Player.Ball);
 
@@ -893,14 +887,56 @@ namespace StackBall
             Player.OnDie = OnDie;
         }
 
+        private string GetTexture(int level)
+        {
+            var data = File.ReadAllText("textures.txt");
+            var textures = data.Split("\n", StringSplitOptions.RemoveEmptyEntries);
+            string result = null;
+
+            foreach (var texture in textures)
+            {
+                var fields = texture.Split(" ", StringSplitOptions.RemoveEmptyEntries);
+                if (fields.Length == 3)
+                {
+                    double start = -1;
+                    double end = -1;
+                    string uri = "";
+                    try
+                    {
+                        start = double.Parse(fields[0], System.Globalization.CultureInfo.InvariantCulture);
+                        end = double.Parse(fields[1], System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    catch
+                    {
+                        MessageBox.Show("Can't parse textures.txt");
+                    }
+                    uri = fields[2];
+                    if (level >= start && level < end)
+                    {
+                        result = uri;
+                    }
+                }
+            }
+
+            if (result == null)
+            {
+                result = "Resources/solid.png";
+            }
+            return result;
+        }
+
         private void StartLevel()
         {
+            Blocks = null;
+            VisualizedBlocks = null;
+
             endMessage.Visibility = Visibility.Hidden;
 
             if (Timer == null)
             {
                 CreateTimer();
             }
+
             CreateBlocks();
             CreateBall();
 
@@ -917,7 +953,6 @@ namespace StackBall
 
             viewport.Children.Add(Tube);
             viewport.Children.Add(TubeBottom);
-
 
             level.Content = CreateOrOpenSubKey().GetValue(LevelKey);
 
@@ -939,7 +974,7 @@ namespace StackBall
 
         private (ModelVisual3D, ModelVisual3D) CreateTube()
         {
-            const int count = 200;
+            const int count = 100;
             const double radius = 0.5;
 
             var tubeVertices = new List<Point3D>();
@@ -984,6 +1019,8 @@ namespace StackBall
             var tubeBottomModel = new ModelVisual3D() { Content = new Model3DGroup() { Children = new MeshGeometry3D[] { tubeBottom }.Merge(new DiffuseMaterial(Brushes.White)) } };
 
             tubeBottomModel.Transform = GetTubeTransform();
+
+            tube.Freeze();
 
             return (tubeModel, tubeBottomModel);
         }
@@ -1033,7 +1070,16 @@ namespace StackBall
 
             AnimatePower();
 
-            debug.Content = Player.CanHit();
+            if (Environment.TickCount - TickStart >= 1000)
+            {
+                VisualizedFps = Fps;
+                TickStart = Environment.TickCount;
+                Fps = 0;
+            }
+
+            debug.Content = "Able to hit - " + Player.CanHit() + "\n" + "Calculating fps - " + VisualizedFps + "\n" + "Render fps - 🤡pa";
+
+            Fps++;
         }
 
         private void Press(object sender, MouseButtonEventArgs e)

@@ -10,16 +10,21 @@
         <Style x:Key="kwajong" TargetType="Label">
             <Setter Property="FontFamily" Value="Resources/#Kwajong"/>
         </Style>
-    </Window.Resources>
-    <Window.Background>
-        <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
-            <GradientStop Color="#FFF8FF6C"/>
-            <GradientStop Color="#FFF5FFDA" Offset="1"/>
-        </LinearGradientBrush>
-    </Window.Background>
+    </Window.Resources>    
     <Grid>
+        <Rectangle>
+            <Rectangle.CacheMode>
+                <BitmapCache RenderAtScale="5"></BitmapCache>
+            </Rectangle.CacheMode>
+            <Rectangle.Fill>
+                <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                    <GradientStop Color="#FFF8FF6C"/>
+                    <GradientStop Color="#FFF5FFDA" Offset="1"/>
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
         <Grid MouseDown="Press" MouseUp="Release">
-            <Viewport3D Name="viewport" ClipToBounds="False" IsHitTestVisible="False" SnapsToDevicePixels="True" OpacityMask="Black">
+            <Viewport3D Name="viewport" ClipToBounds="False" IsHitTestVisible="False" OpacityMask="Black">
                 <Viewport3D.Camera>
                     <PerspectiveCamera Position="0,0,20" LookDirection="0,0,-1" FieldOfView="45">
                         <PerspectiveCamera.Transform>
@@ -61,7 +66,7 @@
             </Viewbox>
             <Label Style="{StaticResource kwajong}" Name="debug" Content="" Margin="10,10,0,0"/>
             <Label Style="{StaticResource kwajong}" Name="level" Content="" HorizontalAlignment="Center" FontSize="48"/>
-        </Grid>       
+        </Grid>
         <Viewbox>
             <Label Style="{StaticResource kwajong}" Name="endMessage" Content="Restart" MouseDown="End"/>
         </Viewbox>
