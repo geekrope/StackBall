@@ -1077,7 +1077,7 @@ namespace StackBall
                 Fps = 0;
             }
 
-            debug.Content = "Able to hit - " + Player.CanHit() + "\n" + "Calculating fps - " + VisualizedFps + "\n" + "Render fps - 🤡pa";
+            debug.Content = "Able to hit - " + Player.CanHit() + "\n" + "Calculating fps - " + VisualizedFps + "\n" + "Render fps - 🤡";
 
             Fps++;
         }
